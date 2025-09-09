@@ -31,9 +31,9 @@ import {
   formatDisplayValue, 
   validateReadResult 
 } from '@/utils/dataParser';
-import { useAddressRanges } from '@/hooks/useAddressRanges';
 import { useErrorHandler } from '@/hooks/useErrorHandler';
 import { notifications } from '@/utils/notifications';
+import { useAddressRangeContext } from '@/contexts/AddressRangeContext';
 
 interface DataReaderProps {
   connectionConfig: ConnectionConfig;
@@ -49,7 +49,7 @@ export function DataReader({ connectionConfig, disabled = false }: DataReaderPro
   const [error, setError] = useState<string | null>(null);
   const [showResultDialog, setShowResultDialog] = useState(false);
 
-  const { ranges } = useAddressRanges();
+  const { ranges, refreshTrigger } = useAddressRangeContext();
   const { handleError } = useErrorHandler({
     showNotifications: true,
     maxErrors: 10,
@@ -65,6 +65,7 @@ export function DataReader({ connectionConfig, disabled = false }: DataReaderPro
     console.log('DataReader ranges updated:', {
       total: ranges.length,
       enabled: enabledRanges.length,
+      refreshTrigger,
       ranges: ranges.map(r => ({ 
         id: r.id.slice(-4), 
         enabled: r.enabled, 
@@ -73,7 +74,7 @@ export function DataReader({ connectionConfig, disabled = false }: DataReaderPro
         length: r.length 
       }))
     });
-  }, [ranges, enabledRanges]);
+  }, [ranges, enabledRanges, refreshTrigger]);
 
   // 构建读取请求
   const buildReadRequest = useCallback(() => {

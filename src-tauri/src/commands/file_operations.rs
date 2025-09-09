@@ -49,6 +49,7 @@ pub async fn initialize_csv_file(
 pub async fn append_data_to_file(
     file_path: String,
     data: BatchReadResult,
+    address_ranges: Vec<ManagedAddressRange>,
 ) -> Result<String, String> {
     debug!("追加数据到文件: {}", file_path);
     
@@ -60,7 +61,7 @@ pub async fn append_data_to_file(
         .map_err(|e| format!("打开文件失败: {}", e))?;
     
     // 将BatchReadResult转换为CSV行
-    let csv_line = generate_csv_line(&data)?;
+    let csv_line = generate_csv_line(&data, &address_ranges)?;
     
     writeln!(file, "{}", csv_line)
         .map_err(|e| format!("写入数据失败: {}", e))?;
@@ -76,10 +77,24 @@ pub async fn append_data_to_file(
 fn generate_csv_header(address_ranges: &[ManagedAddressRange]) -> String {
     let mut headers = vec!["采集时间".to_string()];
     
-    // 为每个地址范围的每个地址添加列
+    // 为每个地址范围生成列
     for range in address_ranges {
-        for addr in range.start_address..(range.start_address + range.length) {
-            headers.push(format!("地址_{}", addr));
+        // 根据数据类型决定列数
+        match range.data_type.as_str() {
+            "uint32" | "int32" | "float32" => {
+                // 32位数据类型，每两个地址组合成一个数据
+                let mut addr = range.start_address;
+                while addr < range.start_address + range.length {
+                    headers.push(format!("地址_{}", addr));
+                    addr += 2;
+                }
+            }
+            _ => {
+                // 16位数据类型，每个地址一个数据
+                for addr in range.start_address..(range.start_address + range.length) {
+                    headers.push(format!("地址_{}", addr));
+                }
+            }
         }
     }
     
@@ -87,21 +102,55 @@ fn generate_csv_header(address_ranges: &[ManagedAddressRange]) -> String {
 }
 
 /// 将BatchReadResult转换为CSV行
-fn generate_csv_line(data: &BatchReadResult) -> Result<String, String> {
+fn generate_csv_line(data: &BatchReadResult, address_ranges: &[ManagedAddressRange]) -> Result<String, String> {
     let mut values = vec![];
     
     // 添加时间戳
     let timestamp = parse_timestamp(&data.timestamp)?;
     values.push(timestamp.format("%Y-%m-%d %H:%M:%S%.3f").to_string());
     
-    // 按地址顺序添加值
+    // 创建地址到结果的映射
+    let mut result_map = std::collections::HashMap::new();
     for result in &data.results {
-        let value = if result.success {
-            result.parsed_value.clone()
-        } else {
-            "ERROR".to_string()
-        };
-        values.push(value);
+        result_map.insert(result.address, result);
+    }
+    
+    // 根据地址范围生成值
+    for range in address_ranges {
+        match range.data_type.as_str() {
+            "uint32" | "int32" | "float32" => {
+                // 32位数据类型，每两个地址组合成一个数据
+                let mut addr = range.start_address;
+                while addr < range.start_address + range.length {
+                    if let Some(result) = result_map.get(&addr) {
+                        let value = if result.success {
+                            result.parsed_value.clone()
+                        } else {
+                            "ERROR".to_string()
+                        };
+                        values.push(value);
+                    } else {
+                        values.push("ERROR".to_string());
+                    }
+                    addr += 2;
+                }
+            }
+            _ => {
+                // 16位数据类型，每个地址一个数据
+                for addr in range.start_address..(range.start_address + range.length) {
+                    if let Some(result) = result_map.get(&addr) {
+                        let value = if result.success {
+                            result.parsed_value.clone()
+                        } else {
+                            "ERROR".to_string()
+                        };
+                        values.push(value);
+                    } else {
+                        values.push("ERROR".to_string());
+                    }
+                }
+            }
+        }
     }
     
     Ok(values.join(","))
@@ -186,7 +235,19 @@ mod tests {
             duration_ms: 100,
         };
         
-        let line = generate_csv_line(&data).unwrap();
+        let ranges = vec![
+            ManagedAddressRange {
+                id: "test".to_string(),
+                name: None,
+                start_address: 0,
+                length: 2,
+                data_type: "uint16".to_string(),
+                description: None,
+                enabled: Some(true),
+            }
+        ];
+        
+        let line = generate_csv_line(&data, &ranges).unwrap();
         // 只检查格式，不检查具体时间值
         assert!(line.contains("100,ERROR"));
     }
@@ -221,10 +282,52 @@ mod tests {
             duration_ms: 100,
         };
         
-        let line = generate_csv_line(&data).unwrap();
-        // 验证CSV中包含解析后的浮点数值，而不是原始值
-        assert!(line.contains("42,3"));
+        let ranges = vec![
+            ManagedAddressRange {
+                id: "float32_test".to_string(),
+                name: None,
+                start_address: 0,
+                length: 4, // 读取 4 个地址，组成 2 个 float32 值
+                data_type: "float32".to_string(),
+                description: None,
+                enabled: Some(true),
+            }
+        ];
+        
+        let line = generate_csv_line(&data, &ranges).unwrap();
+        // 验证CSV中只包含第一个地址的值（组合后的数据）
+        assert!(line.contains("42"));
+        assert!(!line.contains("3")); // 不应包含第二个组合数据，因为它是地址2和3的组合
         assert!(!line.contains("1109393408")); // 不应包含原始的32位整数值
+    }
+
+    #[test]
+    fn test_generate_csv_header_with_mixed_types() {
+        let ranges = vec![
+            ManagedAddressRange {
+                id: "uint16_range".to_string(),
+                name: None,
+                start_address: 0,
+                length: 2,
+                data_type: "uint16".to_string(),
+                description: None,
+                enabled: Some(true),
+            },
+            ManagedAddressRange {
+                id: "float32_range".to_string(),
+                name: None,
+                start_address: 10,
+                length: 4,
+                data_type: "float32".to_string(),
+                description: None,
+                enabled: Some(true),
+            }
+        ];
+        
+        let header = generate_csv_header(&ranges);
+        // uint16: 地址_0, 地址_1
+        // float32: 地址_10 (地址_10和11的组合), 地址_12 (地址_12和13的组合)
+        assert_eq!(header, "采集时间,地址_0,地址_1,地址_10,地址_12");
     }
     
     #[test]

@@ -32,7 +32,10 @@ export const AddressRangeManager: React.FC = () => {
     importConfig,
     isLoading,
     error,
-  } = useAddressRanges();
+  } = useAddressRanges({ onRangesChange: () => {
+    // 地址段变化时会触发回调，通知父组件刷新
+    console.log('Address ranges changed, triggering refresh');
+  }});
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingRange, setEditingRange] = useState<ManagedAddressRange | undefined>();
@@ -79,10 +82,6 @@ export const AddressRangeManager: React.FC = () => {
       updateRange(editingRange.id, range);
     } else {
       addRange(range);
-      // 添加新地址后刷新页面
-      setTimeout(() => {
-        window.location.reload();
-      }, 500);
     }
   };
 

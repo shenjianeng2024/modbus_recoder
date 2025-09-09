@@ -24,6 +24,7 @@ interface UseAddressRangesReturn {
   importConfig: (jsonConfig: string) => boolean;
   isLoading: boolean;
   error: string | null;
+  onRangesChange?: (ranges: ManagedAddressRange[]) => void; // 添加变化回调
 }
 
 const STORAGE_KEY = 'modbus_address_ranges';
@@ -32,7 +33,7 @@ const STORAGE_KEY = 'modbus_address_ranges';
  * 地址范围管理 Hook
  * 提供地址段的增删改查、验证、导入导出等功能
  */
-export const useAddressRanges = (): UseAddressRangesReturn => {
+export const useAddressRanges = (options?: { onRangesChange?: (ranges: ManagedAddressRange[]) => void }): UseAddressRangesReturn => {
   const [ranges, setRanges] = useState<ManagedAddressRange[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -204,5 +205,6 @@ export const useAddressRanges = (): UseAddressRangesReturn => {
     importConfig,
     isLoading,
     error,
+    onRangesChange: options?.onRangesChange,
   };
 };

@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { save } from '@tauri-apps/plugin-dialog';
 import { Button } from '@/components/ui/button';
@@ -21,11 +21,11 @@ import {
   File,
   FolderOpen
 } from 'lucide-react';
-import { ManagedAddressRange, BatchReadResult, DisplayFormat } from '@/types/modbus';
+import { BatchReadResult, DisplayFormat } from '@/types/modbus';
 import { notifications } from '@/utils/notifications';
+import { useAddressRangeContext } from '@/contexts/AddressRangeContext';
 
 interface BatchCollectionProps {
-  addressRanges: ManagedAddressRange[];
   disabled?: boolean;
 }
 
@@ -36,7 +36,8 @@ interface CollectionSettings {
   outputFilePath: string | null; // 输出文件路径
 }
 
-export function BatchCollection({ addressRanges, disabled = false }: BatchCollectionProps) {
+export function BatchCollection({ disabled = false }: BatchCollectionProps) {
+  const { ranges: addressRanges, refreshTrigger } = useAddressRangeContext();
   const [isRunning, setIsRunning] = useState(false);
   const [settings, setSettings] = useState<CollectionSettings>({
     interval: 1000,
@@ -57,6 +58,25 @@ export function BatchCollection({ addressRanges, disabled = false }: BatchCollec
 
   // 获取启用的地址范围
   const enabledRanges = addressRanges.filter(range => range.enabled !== false);
+
+  // 监听地址段变化
+  useEffect(() => {
+    console.log('BatchCollection address ranges updated:', {
+      total: addressRanges.length,
+      enabled: enabledRanges.length,
+      refreshTrigger
+    });
+    
+    // 如果正在采集，地址段变化时停止采集
+    if (isRunning && enabledRanges.length === 0) {
+      setIsRunning(false);
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+      notifications.warning('采集已停止', '所有地址段已被禁用或删除');
+    }
+  }, [addressRanges, refreshTrigger, enabledRanges.length, isRunning]);
 
   const validateSettings = (): string | null => {
     if (enabledRanges.length === 0) {
@@ -124,7 +144,8 @@ export function BatchCollection({ addressRanges, disabled = false }: BatchCollec
       // 立即将数据追加到文件
       await invoke('append_data_to_file', {
         filePath: settings.outputFilePath,
-        data: result
+        data: result,
+        addressRanges: enabledRanges
       });
       
       setCurrentResult(result);

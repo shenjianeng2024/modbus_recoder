@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { ConnectionConfig } from './components/ConnectionConfig';
 import { AddressRangeManager } from './components/AddressRangeManager';
@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { ConnectionConfig as ConnectionConfigType, ConnectionResult } from './types/modbus';
 import { useAddressRanges } from './hooks/useAddressRanges';
+import { AddressRangeProvider, useAddressRangeContext } from './contexts/AddressRangeContext';
 
 // UX 组件导入
 import { useErrorHandler } from './hooks/useErrorHandler';
@@ -16,7 +17,26 @@ import { useAppShortcuts } from './hooks/useKeyboardShortcuts';
 import { ErrorType } from './types/errors';
 import { notifications } from './utils/notifications';
 
-function App() {
+// 地址段管理的包装组件
+function AppWithAddressRange() {
+  const [refreshKey, setRefreshKey] = useState(0);
+  
+  // 处理地址段变化的回调
+  const handleRangesChange = useCallback(() => {
+    setRefreshKey(prev => prev + 1);
+  }, []);
+
+  // 使用地址范围管理 Hook
+  const { ranges } = useAddressRanges({ onRangesChange: handleRangesChange });
+
+  return (
+    <AddressRangeProvider ranges={ranges}>
+      <AppContent key={refreshKey} />
+    </AddressRangeProvider>
+  );
+}
+
+function AppContent() {
   const [config, setConnectionConfig] = useState<ConnectionConfigType>({
     ip: '192.168.1.199',
     port: 502,
@@ -24,8 +44,8 @@ function App() {
   const [connectionResult, setConnectionResult] = useState<ConnectionResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  // 使用地址范围管理 Hook
-  const { ranges } = useAddressRanges();
+  // 使用地址范围 context
+  const { ranges } = useAddressRangeContext();
 
   // 使用错误处理 Hook
   const { handleError, clearAllErrors } = useErrorHandler({
@@ -151,7 +171,6 @@ function App() {
 
         {/* 批量采集功能 */}
         <BatchCollection 
-          addressRanges={ranges}
           disabled={!connectionResult?.success} 
         />
 
@@ -196,4 +215,4 @@ function App() {
   );
 }
 
-export default App;
+export default AppWithAddressRange;
