@@ -36,7 +36,7 @@ impl ModbusClient {
     }
     
     /// 将原始数据转换为AddressReadResult
-    fn create_address_result(
+    pub fn create_address_result(
         address: u16,
         value: u16,
         format: &str,
@@ -55,6 +55,30 @@ impl ModbusClient {
                 } else {
                     (value as u32, Self::format_value(value, format), "uint16".to_string())
                 }
+            }
+            "uint32" => {
+                if let Some(next) = next_value {
+                    // 大端序：高位在前，低位在后
+                    let raw_value = ((value as u32) << 16) | (next as u32);
+                    (raw_value, raw_value.to_string(), "uint32".to_string())
+                } else {
+                    (value as u32, Self::format_value(value, format), "uint16".to_string())
+                }
+            }
+            "int32" => {
+                if let Some(next) = next_value {
+                    // 大端序：高位在前，低位在后
+                    let raw_value = ((value as u32) << 16) | (next as u32);
+                    let parsed_value = raw_value as i32;
+                    (raw_value as u32, parsed_value.to_string(), "int32".to_string())
+                } else {
+                    (value as u32, Self::format_value(value, format), "uint16".to_string())
+                }
+            }
+            "int16" => {
+                // 将 u16 转换为 i16（有符号16位整数）
+                let parsed_value = value as i16;
+                (value as u32, parsed_value.to_string(), "int16".to_string())
             }
             _ => {
                 (value as u32, Self::format_value(value, format), data_type.to_string())
@@ -403,53 +427,57 @@ impl ModbusClient {
             match self.read_holding_registers(range.clone()).await {
                 Ok(read_result) => {
                     // 根据数据类型处理结果
-                    if range.data_type == "float32" {
-                        // 对于 float32，每两个寄存器组成一个浮点数
-                        for i in (0..read_result.data.len()).step_by(2) {
-                            if i + 1 < read_result.data.len() {
+                    match range.data_type.as_str() {
+                        "float32" | "uint32" | "int32" => {
+                            // 对于 32 位数据类型，每两个寄存器组成一个 32 位值
+                            for i in (0..read_result.data.len()).step_by(2) {
+                                if i + 1 < read_result.data.len() {
+                                    let addr = range.start + i as u16;
+                                    let addr_result = Self::create_address_result(
+                                        addr,
+                                        read_result.data[i],
+                                        format_str,
+                                        &timestamp,
+                                        None, // 成功读取，无错误
+                                        &range.data_type,
+                                        Some(read_result.data[i + 1]),
+                                    );
+                                    all_results.push(addr_result);
+                                    success_count += 1;
+                                } else {
+                                    // 如果有奇数个数据，最后一个作为 uint16 处理
+                                    let addr = range.start + i as u16;
+                                    let error_msg = format!("{} 需要偶数个寄存器", range.data_type);
+                                    let addr_result = Self::create_address_result(
+                                        addr,
+                                        read_result.data[i],
+                                        format_str,
+                                        &timestamp,
+                                        Some(error_msg),
+                                        "uint16",
+                                        None,
+                                    );
+                                    all_results.push(addr_result);
+                                    failed_count += 1;
+                                }
+                            }
+                        }
+                        _ => {
+                            // 其他数据类型（uint16, int16），每个寄存器单独处理
+                            for (i, &value) in read_result.data.iter().enumerate() {
                                 let addr = range.start + i as u16;
                                 let addr_result = Self::create_address_result(
                                     addr,
-                                    read_result.data[i],
+                                    value,
                                     format_str,
                                     &timestamp,
                                     None, // 成功读取，无错误
                                     &range.data_type,
-                                    Some(read_result.data[i + 1]),
-                                );
-                                all_results.push(addr_result);
-                                success_count += 1;
-                            } else {
-                                // 如果有奇数个数据，最后一个作为 uint16 处理
-                                let addr = range.start + i as u16;
-                                let addr_result = Self::create_address_result(
-                                    addr,
-                                    read_result.data[i],
-                                    format_str,
-                                    &timestamp,
-                                    Some("Float32 需要偶数个寄存器".to_string()),
-                                    "uint16",
                                     None,
                                 );
                                 all_results.push(addr_result);
-                                failed_count += 1;
+                                success_count += 1;
                             }
-                        }
-                    } else {
-                        // 其他数据类型，每个寄存器单独处理
-                        for (i, &value) in read_result.data.iter().enumerate() {
-                            let addr = range.start + i as u16;
-                            let addr_result = Self::create_address_result(
-                                addr,
-                                value,
-                                format_str,
-                                &timestamp,
-                                None, // 成功读取，无错误
-                                &range.data_type,
-                                None,
-                            );
-                            all_results.push(addr_result);
-                            success_count += 1;
                         }
                     }
                     debug!("第 {} 个范围读取成功，获得 {} 个地址", range_idx + 1, read_result.data.len());
@@ -500,5 +528,195 @@ impl Drop for ModbusClient {
     fn drop(&mut self) {
         // Context will be dropped automatically
         self.context = None;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_create_address_result_float32() {
+        // 测试 f32 解析：42.0 的 IEEE 754 表示
+        // 42.0 = 0x42280000 = 高位字节: 0x4228, 低位字节: 0x0000
+        let result = ModbusClient::create_address_result(
+            100,             // address
+            0x4228,          // 高位字节
+            "dec",           // format
+            "2024-01-01T12:00:00",  // timestamp
+            None,            // error
+            "float32",       // data_type
+            Some(0x0000),    // 低位字节
+        );
+
+        assert_eq!(result.address, 100);
+        assert_eq!(result.raw_value, 0x42280000);
+        assert_eq!(result.parsed_value, "42");
+        assert_eq!(result.data_type, "float32");
+        assert!(result.success);
+    }
+
+    #[test]
+    fn test_create_address_result_float32_negative() {
+        // 测试负数 f32：-3.14 的 IEEE 754 表示
+        // -3.14 ≈ 0xC048F5C3 = 高位字节: 0xC048, 低位字节: 0xF5C3
+        let result = ModbusClient::create_address_result(
+            200,             // address
+            0xC048,          // 高位字节
+            "dec",           // format
+            "2024-01-01T12:00:00",  // timestamp
+            None,            // error
+            "float32",       // data_type
+            Some(0xF5C3),    // 低位字节
+        );
+
+        assert_eq!(result.address, 200);
+        assert_eq!(result.raw_value, 0xC048F5C3);
+        // 验证解析后的值是负数且近似等于 -3.14
+        let parsed_float: f32 = result.parsed_value.parse().unwrap();
+        assert!(parsed_float < 0.0);
+        assert!((parsed_float + 3.14).abs() < 0.01); // 允许小的浮点误差
+        assert_eq!(result.data_type, "float32");
+        assert!(result.success);
+    }
+
+    #[test]
+    fn test_create_address_result_uint32() {
+        // 测试 uint32：65537 = 0x00010001 = 高位字节: 0x0001, 低位字节: 0x0001
+        let result = ModbusClient::create_address_result(
+            300,             // address
+            0x0001,          // 高位字节
+            "dec",           // format
+            "2024-01-01T12:00:00",  // timestamp
+            None,            // error
+            "uint32",        // data_type
+            Some(0x0001),    // 低位字节
+        );
+
+        assert_eq!(result.address, 300);
+        assert_eq!(result.raw_value, 0x00010001);
+        assert_eq!(result.parsed_value, "65537");
+        assert_eq!(result.data_type, "uint32");
+        assert!(result.success);
+    }
+
+    #[test]
+    fn test_create_address_result_int32() {
+        // 测试 int32：-1 = 0xFFFFFFFF = 高位字节: 0xFFFF, 低位字节: 0xFFFF
+        let result = ModbusClient::create_address_result(
+            400,             // address
+            0xFFFF,          // 高位字节
+            "dec",           // format
+            "2024-01-01T12:00:00",  // timestamp
+            None,            // error
+            "int32",         // data_type
+            Some(0xFFFF),    // 低位字节
+        );
+
+        assert_eq!(result.address, 400);
+        assert_eq!(result.raw_value, 0xFFFFFFFF);
+        assert_eq!(result.parsed_value, "-1");
+        assert_eq!(result.data_type, "int32");
+        assert!(result.success);
+    }
+
+    #[test]
+    fn test_create_address_result_single_register() {
+        // 测试单个寄存器（无 next_value）
+        let result = ModbusClient::create_address_result(
+            500,             // address
+            1234,            // value
+            "dec",           // format
+            "2024-01-01T12:00:00",  // timestamp
+            None,            // error
+            "uint16",        // data_type
+            None,            // no next_value
+        );
+
+        assert_eq!(result.address, 500);
+        assert_eq!(result.raw_value, 1234);
+        assert_eq!(result.parsed_value, "1234");
+        assert_eq!(result.data_type, "uint16");
+        assert!(result.success);
+    }
+
+    #[test]
+    fn test_create_address_result_float32_partial_data() {
+        // 测试 f32 但没有提供 next_value（应该退化为 uint16）
+        let result = ModbusClient::create_address_result(
+            600,             // address
+            0x4228,          // value
+            "dec",           // format
+            "2024-01-01T12:00:00",  // timestamp
+            None,            // error
+            "float32",       // data_type (请求f32但数据不足)
+            None,            // no next_value
+        );
+
+        assert_eq!(result.address, 600);
+        assert_eq!(result.raw_value, 0x4228);
+        assert_eq!(result.parsed_value, "16936"); // 0x4228 的十进制表示
+        assert_eq!(result.data_type, "uint16");   // 退化为uint16
+        assert!(result.success);
+    }
+
+    #[test]
+    fn test_create_address_result_int16() {
+        // 测试 int16：-1（0xFFFF 的有符号表示）
+        let result = ModbusClient::create_address_result(
+            700,             // address
+            0xFFFF,          // value (65535，但作为int16应该是-1)
+            "dec",           // format
+            "2024-01-01T12:00:00",  // timestamp
+            None,            // error
+            "int16",         // data_type
+            None,            // no next_value (int16只需要一个寄存器)
+        );
+
+        assert_eq!(result.address, 700);
+        assert_eq!(result.raw_value, 0xFFFF);
+        assert_eq!(result.parsed_value, "-1");  // 应该解析为有符号值
+        assert_eq!(result.data_type, "int16");
+        assert!(result.success);
+    }
+
+    #[test]
+    fn test_create_address_result_int16_positive() {
+        // 测试 int16：32767（最大正数）
+        let result = ModbusClient::create_address_result(
+            800,             // address
+            0x7FFF,          // value (32767)
+            "dec",           // format
+            "2024-01-01T12:00:00",  // timestamp
+            None,            // error
+            "int16",         // data_type
+            None,            // no next_value
+        );
+
+        assert_eq!(result.address, 800);
+        assert_eq!(result.raw_value, 0x7FFF);
+        assert_eq!(result.parsed_value, "32767");
+        assert_eq!(result.data_type, "int16");
+        assert!(result.success);
+    }
+
+    #[test]
+    fn test_create_address_result_int16_negative() {
+        // 测试 int16：-32768（最小负数）
+        let result = ModbusClient::create_address_result(
+            900,             // address
+            0x8000,          // value (32768，但作为int16应该是-32768)
+            "dec",           // format
+            "2024-01-01T12:00:00",  // timestamp
+            None,            // error
+            "int16",         // data_type
+            None,            // no next_value
+        );
+
+        assert_eq!(result.address, 900);
+        assert_eq!(result.raw_value, 0x8000);
+        assert_eq!(result.parsed_value, "-32768");
+        assert_eq!(result.data_type, "int16");
+        assert!(result.success);
     }
 }

@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::modbus::client::ModbusClient;
     use crate::modbus::types::AddressRange;
 
     #[test]
@@ -50,7 +50,7 @@ mod tests {
         let value = 0x4049;
         let next_value = Some(0x0FDB);
         
-        let result = super::ModbusClient::create_address_result(
+        let result = ModbusClient::create_address_result(
             addr,
             value,
             "dec",
@@ -74,7 +74,7 @@ mod tests {
         let addr = 100;
         let value = 1234;
         
-        let result = super::ModbusClient::create_address_result(
+        let result = ModbusClient::create_address_result(
             addr,
             value,
             "hex",
@@ -134,5 +134,80 @@ mod tests {
         let neg_zero_bits = 0x80000000u32;
         let neg_zero = f32::from_bits(neg_zero_bits);
         assert_eq!(neg_zero, -0.0);
+    }
+
+    #[test]
+    fn test_create_address_result_uint32() {
+        // 测试创建 uint32 类型的地址结果
+        let timestamp = "2024-01-01T00:00:00Z";
+        let addr = 100;
+        let value = 0x1234;
+        let next_value = Some(0x5678);
+        
+        let result = ModbusClient::create_address_result(
+            addr,
+            value,
+            "dec",
+            timestamp,
+            None,
+            "uint32",
+            next_value,
+        );
+        
+        assert_eq!(result.address, addr);
+        assert_eq!(result.raw_value, 0x12345678);
+        assert_eq!(result.parsed_value, "305419896");
+        assert_eq!(result.data_type, "uint32");
+        assert!(result.success);
+    }
+
+    #[test]
+    fn test_create_address_result_int32() {
+        // 测试创建 int32 类型的地址结果
+        let timestamp = "2024-01-01T00:00:00Z";
+        let addr = 100;
+        let value = 0xFFFF;
+        let next_value = Some(0xFFFF);
+        
+        let result = ModbusClient::create_address_result(
+            addr,
+            value,
+            "dec",
+            timestamp,
+            None,
+            "int32",
+            next_value,
+        );
+        
+        assert_eq!(result.address, addr);
+        assert_eq!(result.raw_value, 0xFFFFFFFF);
+        assert_eq!(result.parsed_value, "-1");
+        assert_eq!(result.data_type, "int32");
+        assert!(result.success);
+    }
+
+    #[test]
+    fn test_create_address_result_uint32_no_next_value() {
+        // 测试 uint32 类型但没有下一个值的情况
+        let timestamp = "2024-01-01T00:00:00Z";
+        let addr = 100;
+        let value = 0x1234;
+        let next_value = None;
+        
+        let result = ModbusClient::create_address_result(
+            addr,
+            value,
+            "dec",
+            timestamp,
+            None,
+            "uint32",
+            next_value,
+        );
+        
+        assert_eq!(result.address, addr);
+        assert_eq!(result.raw_value, 0x1234);
+        assert_eq!(result.parsed_value, "4660");
+        assert_eq!(result.data_type, "uint16");
+        assert!(result.success);
     }
 }

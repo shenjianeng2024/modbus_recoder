@@ -97,7 +97,7 @@ fn generate_csv_line(data: &BatchReadResult) -> Result<String, String> {
     // 按地址顺序添加值
     for result in &data.results {
         let value = if result.success {
-            result.raw_value.to_string()
+            result.parsed_value.clone()
         } else {
             "ERROR".to_string()
         };
@@ -189,6 +189,42 @@ mod tests {
         let line = generate_csv_line(&data).unwrap();
         // 只检查格式，不检查具体时间值
         assert!(line.contains("100,ERROR"));
+    }
+
+    #[test]
+    fn test_generate_csv_line_with_float32() {
+        let data = BatchReadResult {
+            results: vec![
+                AddressReadResult {
+                    address: 0,
+                    raw_value: 0x42280000, // 42.0 的 IEEE 754 表示
+                    parsed_value: "42".to_string(), // 解析后的 f32 值
+                    timestamp: "2024-01-01T12:00:00".to_string(),
+                    success: true,
+                    error: None,
+                    data_type: "float32".to_string(),
+                },
+                AddressReadResult {
+                    address: 2,
+                    raw_value: 0x40400000, // 3.0 的 IEEE 754 表示
+                    parsed_value: "3".to_string(), // 解析后的 f32 值
+                    timestamp: "2024-01-01T12:00:00".to_string(),
+                    success: true,
+                    error: None,
+                    data_type: "float32".to_string(),
+                }
+            ],
+            total_count: 2,
+            success_count: 2,
+            failed_count: 0,
+            timestamp: "2024-01-01T12:00:00".to_string(),
+            duration_ms: 100,
+        };
+        
+        let line = generate_csv_line(&data).unwrap();
+        // 验证CSV中包含解析后的浮点数值，而不是原始值
+        assert!(line.contains("42,3"));
+        assert!(!line.contains("1109393408")); // 不应包含原始的32位整数值
     }
     
     #[test]

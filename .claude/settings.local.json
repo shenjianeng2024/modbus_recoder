@@ -7,7 +7,9 @@
       "Bash(cargo search:*)",
       "mcp__filesystem__directory_tree",
       "Bash(git reset:*)",
-      "Bash(git rm:*)"
+      "Bash(git rm:*)",
+      "Bash(./scripts/verify-f32-fix.sh:*)",
+      "Bash(cargo test:*)"
     ],
     "deny": [],
     "ask": []
