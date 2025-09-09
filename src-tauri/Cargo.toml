@@ -1,0 +1,39 @@
+[package]
+name = "modbus_reader"
+version = "0.1.0"
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+tauri = { version = "2", features = [] }
+tokio = { version = "1.0", features = ["full"] }
+tokio-modbus = "0.16.1"
+thiserror = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+tauri-plugin-dialog = "2"
+tauri-plugin-shell = "2"
+tauri-plugin-fs = "2"
+log = "0.4"
+env_logger = "0.10"
+
+[dev-dependencies]
+tokio-test = "0.4"
+mockall = "0.12"
+tempfile = "3.0"
+tracing-test = "0.2"
+serial_test = "3.1"
+rand = "0.8"
+futures = "0.3"
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "modbus_benchmarks"
+harness = false
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]

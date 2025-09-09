@@ -1,0 +1,31 @@
+[build]
+# 测试时使用的构建配置
+
+[target.'cfg(test)']
+# 测试专用配置
+rustflags = [
+    # 启用测试时的额外检查
+    "-C", "debug-assertions=on",
+    # 启用溢出检查
+    "-C", "overflow-checks=on",
+]
+
+[env]
+# 测试环境变量
+RUST_LOG = "debug"
+RUST_BACKTRACE = "1"
+MODBUS_TEST_TIMEOUT = "5000"
+
+[alias]
+# Cargo别名用于快速测试
+test-unit = "test --lib --bins"
+test-integration = "test --tests"
+test-all = "test --all-targets"
+# test-coverage = "tarpaulin --out Html --out Lcov --output-dir target/coverage"  # 需要额外安装 cargo-tarpaulin
+test-bench = "bench"
+test-clean = "clean"
+
+# 质量检查别名
+quality = "clippy --all-targets --all-features -- -D warnings"
+fmt-check = "fmt -- --check"
+audit = "audit"
