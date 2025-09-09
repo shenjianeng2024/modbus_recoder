@@ -11,13 +11,19 @@ pub struct ModbusConfig {
 pub struct AddressRange {
     pub start: u16,
     pub count: u16,
+    #[serde(default = "default_data_type")]
+    pub data_type: String,
+}
+
+fn default_data_type() -> String {
+    "uint16".to_string()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DataPoint {
     pub timestamp: String,
     pub address: u16,
-    pub value: u16,
+    pub value: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

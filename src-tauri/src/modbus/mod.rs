@@ -1,4 +1,5 @@
 pub mod client;
+pub mod client_tests;
 pub mod error;
 pub mod manager;
 pub mod types;

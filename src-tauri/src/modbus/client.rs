@@ -42,15 +42,33 @@ impl ModbusClient {
         format: &str,
         timestamp: &str,
         error: Option<String>,
+        data_type: &str,
+        next_value: Option<u16>,
     ) -> AddressReadResult {
+        let (raw_value, parsed_value, actual_data_type) = match data_type {
+            "float32" => {
+                if let Some(next) = next_value {
+                    // IEEE 754 大端序：高位在前，低位在后
+                    let raw_value = ((value as u32) << 16) | (next as u32);
+                    let parsed_value = f32::from_bits(raw_value);
+                    (raw_value, parsed_value.to_string(), "float32".to_string())
+                } else {
+                    (value as u32, Self::format_value(value, format), "uint16".to_string())
+                }
+            }
+            _ => {
+                (value as u32, Self::format_value(value, format), data_type.to_string())
+            }
+        };
+
         AddressReadResult {
             address,
-            raw_value: value,
-            parsed_value: Self::format_value(value, format),
+            raw_value,
+            parsed_value,
             timestamp: timestamp.to_string(),
             success: error.is_none(),
             error,
-            data_type: "uint16".to_string(), // 默认为uint16类型
+            data_type: actual_data_type,
         }
     }
 
@@ -384,18 +402,55 @@ impl ModbusClient {
             
             match self.read_holding_registers(range.clone()).await {
                 Ok(read_result) => {
-                    // 将范围读取结果转换为单地址结果
-                    for (i, &value) in read_result.data.iter().enumerate() {
-                        let addr = range.start + i as u16;
-                        let addr_result = Self::create_address_result(
-                            addr,
-                            value,
-                            format_str,
-                            &timestamp,
-                            None, // 成功读取，无错误
-                        );
-                        all_results.push(addr_result);
-                        success_count += 1;
+                    // 根据数据类型处理结果
+                    if range.data_type == "float32" {
+                        // 对于 float32，每两个寄存器组成一个浮点数
+                        for i in (0..read_result.data.len()).step_by(2) {
+                            if i + 1 < read_result.data.len() {
+                                let addr = range.start + i as u16;
+                                let addr_result = Self::create_address_result(
+                                    addr,
+                                    read_result.data[i],
+                                    format_str,
+                                    &timestamp,
+                                    None, // 成功读取，无错误
+                                    &range.data_type,
+                                    Some(read_result.data[i + 1]),
+                                );
+                                all_results.push(addr_result);
+                                success_count += 1;
+                            } else {
+                                // 如果有奇数个数据，最后一个作为 uint16 处理
+                                let addr = range.start + i as u16;
+                                let addr_result = Self::create_address_result(
+                                    addr,
+                                    read_result.data[i],
+                                    format_str,
+                                    &timestamp,
+                                    Some("Float32 需要偶数个寄存器".to_string()),
+                                    "uint16",
+                                    None,
+                                );
+                                all_results.push(addr_result);
+                                failed_count += 1;
+                            }
+                        }
+                    } else {
+                        // 其他数据类型，每个寄存器单独处理
+                        for (i, &value) in read_result.data.iter().enumerate() {
+                            let addr = range.start + i as u16;
+                            let addr_result = Self::create_address_result(
+                                addr,
+                                value,
+                                format_str,
+                                &timestamp,
+                                None, // 成功读取，无错误
+                                &range.data_type,
+                                None,
+                            );
+                            all_results.push(addr_result);
+                            success_count += 1;
+                        }
                     }
                     debug!("第 {} 个范围读取成功，获得 {} 个地址", range_idx + 1, read_result.data.len());
                 }
@@ -412,6 +467,8 @@ impl ModbusClient {
                             format_str,
                             &timestamp,
                             Some(error_msg.clone()),
+                            &range.data_type,
+                            None,
                         );
                         all_results.push(addr_result);
                         failed_count += 1;

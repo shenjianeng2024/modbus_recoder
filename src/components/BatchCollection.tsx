@@ -113,7 +113,8 @@ export function BatchCollection({ addressRanges, disabled = false }: BatchCollec
       const request = {
         ranges: enabledRanges.map(range => ({
           start: range.startAddress,
-          count: range.length
+          count: range.length,
+          data_type: range.dataType || 'uint16'  // 添加数据类型字段
         })),
         format: settings.format
       };

@@ -76,10 +76,11 @@ export function DataReader({ connectionConfig, disabled = false }: DataReaderPro
   }, [ranges, enabledRanges]);
 
   // 构建读取请求
-  const buildReadRequest = useCallback((): { ranges: AddressRange[], format: string } => {
+  const buildReadRequest = useCallback(() => {
     const addressRanges: AddressRange[] = enabledRanges.map(range => ({
       start: range.startAddress,
-      count: range.length
+      count: range.length,
+      data_type: range.dataType || 'uint16'  // 添加数据类型字段
     }));
 
     return {

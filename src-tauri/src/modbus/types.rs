@@ -31,11 +31,29 @@ pub enum ConnectionState {
 pub struct AddressRange {
     pub start: u16,
     pub count: u16,
+    #[serde(default = "default_data_type")]
+    pub data_type: String,
+}
+
+fn default_data_type() -> String {
+    "uint16".to_string()
 }
 
 impl AddressRange {
     pub fn new(start: u16, count: u16) -> Self {
-        Self { start, count }
+        Self { 
+            start, 
+            count,
+            data_type: "uint16".to_string(),
+        }
+    }
+
+    pub fn new_with_type(start: u16, count: u16, data_type: &str) -> Self {
+        Self { 
+            start, 
+            count,
+            data_type: data_type.to_string(),
+        }
     }
 
     pub fn is_valid(&self) -> bool {
@@ -56,7 +74,7 @@ pub struct ReadResult {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AddressReadResult {
     pub address: u16,
-    pub raw_value: u16,
+    pub raw_value: u32, // 改为 u32 以支持 float32 等 32 位数据类型
     pub parsed_value: String, // 支持不同格式的显示
     pub timestamp: String,
     pub success: bool,

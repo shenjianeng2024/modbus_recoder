@@ -11,6 +11,7 @@ export interface ConnectionResult {
 export interface AddressRange {
   start: number;
   count: number;
+  data_type?: string;
 }
 
 // 地址范围管理相关接口
