@@ -24,18 +24,14 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '20'
-        cache: 'pnpm'
         
     - name: Install pnpm
-      uses: pnpm/action-setup@v4
-      with:
-        version: 8
-        run_install: false
+      run: npm install -g pnpm@8
         
     - name: Get pnpm store directory
       shell: pwsh
       run: |
-        echo "STORE_PATH=$(pnpm store path)" >> $env:GITHUB_ENV
+        echo "STORE_PATH=$(pnpm store path)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
         
     - name: Setup pnpm cache
       uses: actions/cache@v4
