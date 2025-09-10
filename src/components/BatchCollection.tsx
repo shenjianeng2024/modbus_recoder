@@ -252,7 +252,7 @@ export function BatchCollection({ disabled = false }: BatchCollectionProps) {
   return (
     <div className="space-y-6">
       {/* 采集设置 */}
-      <Card>
+      <Card className="border-border/50 bg-background/80 backdrop-blur-sm transition-all duration-300 hover:shadow-lg hover:shadow-indigo-500/20 hover:scale-[1.02] hover:border-indigo-400/50">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Settings className="h-5 w-5" />
@@ -399,7 +399,7 @@ export function BatchCollection({ disabled = false }: BatchCollectionProps) {
 
       {/* 采集统计 */}
       {(collectionStats.totalCollections > 0 || isRunning) && (
-        <Card>
+        <Card className="border-border/50 bg-background/80 backdrop-blur-sm transition-all duration-300 hover:shadow-lg hover:shadow-indigo-500/20 hover:scale-[1.02] hover:border-indigo-400/50">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Clock className="h-5 w-5" />
@@ -440,7 +440,7 @@ export function BatchCollection({ disabled = false }: BatchCollectionProps) {
 
       {/* 当前结果 */}
       {currentResult && (
-        <Card>
+        <Card className="border-border/50 bg-background/80 backdrop-blur-sm transition-all duration-300 hover:shadow-lg hover:shadow-indigo-500/20 hover:scale-[1.02] hover:border-indigo-400/50">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               {currentResult.success_count === currentResult.total_count ? (

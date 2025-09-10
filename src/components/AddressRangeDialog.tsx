@@ -229,7 +229,7 @@ export const AddressRangeDialog: React.FC<AddressRangeDialogProps> = ({
           <Button 
             onClick={handleSave} 
             disabled={errors.length > 0}
-            className={`${!editingRange ? 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-medium shadow-md hover:shadow-lg' : ''}`}
+            className={`${editingRange ? 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-medium shadow-md hover:shadow-lg' : 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-medium shadow-md hover:shadow-lg'}`}
           >
             {editingRange ? '保存修改' : '添加地址段'}
           </Button>

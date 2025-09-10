@@ -211,7 +211,7 @@ export function DataReader({ connectionConfig, disabled = false }: DataReaderPro
   return (
     <>
       {/* 控制面板 */}
-      <Card>
+      <Card className="border-border/50 bg-background/80 backdrop-blur-sm transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/20 hover:scale-[1.02] hover:border-blue-400/50">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <BarChart3 className="h-5 w-5" />

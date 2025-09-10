@@ -90,9 +90,11 @@ export const useAddressRanges = (options?: { onRangesChange?: (ranges: ManagedAd
     setRanges(prev => {
       const updated = [...prev, newRange];
       saveToStorage(updated);
+      // 通知变化回调
+      options?.onRangesChange?.(updated);
       return updated;
     });
-  }, [saveToStorage]);
+  }, [saveToStorage, options?.onRangesChange]);
 
   // 更新地址段
   const updateRange = useCallback((id: string, updates: Partial<ManagedAddressRange>) => {
@@ -107,24 +109,30 @@ export const useAddressRanges = (options?: { onRangesChange?: (ranges: ManagedAd
         updatedRange: updated.find(r => r.id === id)
       });
       saveToStorage(updated);
+      // 通知变化回调
+      options?.onRangesChange?.(updated);
       return updated;
     });
-  }, [saveToStorage]);
+  }, [saveToStorage, options?.onRangesChange]);
 
   // 删除地址段
   const removeRange = useCallback((id: string) => {
     setRanges(prev => {
       const updated = prev.filter(range => range.id !== id);
       saveToStorage(updated);
+      // 通知变化回调
+      options?.onRangesChange?.(updated);
       return updated;
     });
-  }, [saveToStorage]);
+  }, [saveToStorage, options?.onRangesChange]);
 
   // 清空所有地址段
   const clearAllRanges = useCallback(() => {
     setRanges([]);
     saveToStorage([]);
-  }, [saveToStorage]);
+    // 通知变化回调
+    options?.onRangesChange?.([]);
+  }, [saveToStorage, options?.onRangesChange]);
 
   // 验证单个地址段
   const validateRange = useCallback((range: ManagedAddressRange): ValidationResult => {
@@ -185,6 +193,8 @@ export const useAddressRanges = (options?: { onRangesChange?: (ranges: ManagedAd
       setRanges(validRanges);
       saveToStorage(validRanges);
       setError(null);
+      // 通知变化回调
+      options?.onRangesChange?.(validRanges);
       return true;
     } catch (err) {
       setError('导入配置失败：JSON 格式错误');

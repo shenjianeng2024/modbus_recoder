@@ -9,7 +9,13 @@
       "Bash(git reset:*)",
       "Bash(git rm:*)",
       "Bash(./scripts/verify-f32-fix.sh:*)",
-      "Bash(cargo test:*)"
+      "Bash(cargo test:*)",
+      "mcp___magicuidesign_mcp__getUIComponents",
+      "mcp___magicuidesign_mcp__getBackgrounds",
+      "mcp___magicuidesign_mcp__getComponents",
+      "mcp___magicuidesign_mcp__getButtons",
+      "Bash(npm run dev:*)",
+      "Bash(npx vite:*)"
     ],
     "deny": [],
     "ask": []
