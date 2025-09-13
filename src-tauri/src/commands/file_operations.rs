@@ -295,10 +295,20 @@ mod tests {
         ];
         
         let line = generate_csv_line(&data, &ranges).unwrap();
-        // 验证CSV中只包含第一个地址的值（组合后的数据）
-        assert!(line.contains("42"));
-        assert!(!line.contains("3")); // 不应包含第二个组合数据，因为它是地址2和3的组合
+        println!("Generated CSV line: {}", line);
+        
+        // 验证CSV中包含正确的浮点数解析值
+        assert!(line.contains("42")); // 第一个float32值
+        assert!(line.contains("3"));  // 第二个float32值 - 现在解析工作正常！
+        
+        // 确保不包含原始的32位整数值
         assert!(!line.contains("1109393408")); // 不应包含原始的32位整数值
+        
+        // 验证CSV格式正确
+        let parts: Vec<&str> = line.split(',').collect();
+        assert_eq!(parts.len(), 3); // 时间戳 + 两个浮点数值
+        assert!(parts[1].contains("42"));
+        assert!(parts[2].contains("3"));
     }
 
     #[test]

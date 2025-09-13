@@ -357,6 +357,71 @@ mod tests {
     }
 
     #[test]
+    fn test_float32_ieee754_special_values() {
+        use crate::modbus::types::ByteOrder;
+        
+        // 测试IEEE 754特殊值的正确处理
+        let test_cases = vec![
+            (0x00000000, "0", "正零"),
+            (0x80000000, "-0", "负零"),
+            (0x7F800000, "inf", "正无穷"),
+            (0xFF800000, "-inf", "负无穷"),
+            (0x7FC00000, "NaN", "NaN"),
+            (0x3F800000, "1", "1.0"),
+            (0xBF800000, "-1", "-1.0"),
+        ];
+        
+        for (raw_bits, expected_prefix, description) in test_cases {
+            let high_word = (raw_bits >> 16) as u16;
+            let low_word = (raw_bits & 0xFFFF) as u16;
+            
+            // 大端序测试
+            let result = ModbusClient::create_address_result_with_byte_order(
+                0, high_word, "dec", "2024-01-01T00:00:00Z", None, "float32", Some(low_word), &ByteOrder::BigEndian
+            );
+            
+            assert_eq!(result.raw_value, raw_bits);
+            assert!(result.parsed_value.starts_with(expected_prefix), 
+                    "{}: Expected to start with '{}', got '{}'", 
+                    description, expected_prefix, result.parsed_value);
+            
+            println!("{}: 0x{:08X} -> '{}'", description, raw_bits, result.parsed_value);
+        }
+    }
+
+    #[test]
+    fn test_float32_precision_and_rounding() {
+        use crate::modbus::types::ByteOrder;
+        
+        // 测试浮点数精度和舍入行为
+        let test_cases = vec![
+            // 一些常见的浮点数及其IEEE 754表示
+            (0x40490FDB, 3.1415927), // π
+            (0x402DF854, 2.718282),  // e
+            (0x3DCCCCCD, 0.1),       // 0.1 (无法精确表示)
+            (0x3E4CCCCD, 0.2),       // 0.2
+            (0x3ECCCCCD, 0.4),       // 0.4
+        ];
+        
+        for (raw_bits, expected_value) in test_cases {
+            let high_word = (raw_bits >> 16) as u16;
+            let low_word = (raw_bits & 0xFFFF) as u16;
+            
+            let result = ModbusClient::create_address_result_with_byte_order(
+                0, high_word, "dec", "2024-01-01T00:00:00Z", None, "float32", Some(low_word), &ByteOrder::BigEndian
+            );
+            
+            let parsed_float: f32 = result.parsed_value.parse().unwrap();
+            assert!((parsed_float - expected_value as f32).abs() < 0.0001, 
+                    "0x{:08X}: Expected ~{}, got {} (string: '{}')", 
+                    raw_bits, expected_value, parsed_float, result.parsed_value);
+            
+            println!("Precision test 0x{:08X}: expected={}, parsed={}, string='{}'", 
+                     raw_bits, expected_value, parsed_float, result.parsed_value);
+        }
+    }
+
+    #[test]
     fn test_create_address_result_uint32() {
         // 测试创建 uint32 类型的地址结果
         let timestamp = "2024-01-01T00:00:00Z";
