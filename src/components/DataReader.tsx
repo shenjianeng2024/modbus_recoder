@@ -28,9 +28,10 @@ import {
 } from '@/types/modbus';
 import { 
   convertBatchResult, 
-  formatDisplayValue, 
   validateReadResult 
 } from '@/utils/dataParser';
+import { formatTimestamp, formatNumber } from '../utils/formatters';
+import { useUserPreferences } from '../hooks/useUserPreferences';
 import { useErrorHandler } from '@/hooks/useErrorHandler';
 import { notifications } from '@/utils/notifications';
 import { useAddressRangeContext } from '@/contexts/AddressRangeContext';
@@ -50,6 +51,7 @@ export function DataReader({ connectionConfig, disabled = false }: DataReaderPro
   const [showResultDialog, setShowResultDialog] = useState(false);
 
   const { ranges, refreshTrigger } = useAddressRangeContext();
+  const { preferences } = useUserPreferences();
   const { handleError } = useErrorHandler({
     showNotifications: true,
     maxErrors: 10,
@@ -151,20 +153,10 @@ export function DataReader({ connectionConfig, disabled = false }: DataReaderPro
     }
   };
 
-  // 格式化时间戳
-  const formatTimestamp = (timestamp: string) => {
-    try {
-      return new Date(timestamp).toLocaleString('zh-CN', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit'
-      });
-    } catch {
-      return timestamp;
-    }
+  // 使用新的时间格式化函数
+  const formatTime = (timestamp: string) => {
+    const formatted = formatTimestamp(timestamp, preferences.timeFormat);
+    return formatted.display;
   };
 
   // 获取状态指示器内容
@@ -356,16 +348,16 @@ export function DataReader({ connectionConfig, disabled = false }: DataReaderPro
                 </div>
 
                 {/* 结果表格 */}
-                <div className="rounded-md border">
+                <div className="rounded-md border overflow-hidden">
                   <Table>
                     <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-20">地址</TableHead>
-                        <TableHead className="w-24">原始值</TableHead>
-                        <TableHead className="w-32">解析值</TableHead>
-                        <TableHead className="w-24">类型</TableHead>
-                        <TableHead className="w-40">时间戳</TableHead>
-                        <TableHead className="w-20">状态</TableHead>
+                      <TableRow className="bg-muted/50">
+                        <TableHead className="w-20 font-semibold">地址</TableHead>
+                        <TableHead className="w-24 font-semibold">原始值</TableHead>
+                        <TableHead className="w-32 font-semibold">解析值</TableHead>
+                        <TableHead className="w-24 font-semibold">类型</TableHead>
+                        <TableHead className="w-40 font-semibold">时间戳</TableHead>
+                        <TableHead className="w-20 font-semibold text-center">状态</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -376,48 +368,94 @@ export function DataReader({ connectionConfig, disabled = false }: DataReaderPro
                           data.address < range.startAddress + range.length
                         );
                         const addressResult = batchResult.results[index];
+                        const isAlternatingRow = preferences.tableStyle.alternatingRowColors && index % 2 === 1;
 
                         return (
-                          <TableRow key={`${data.address}-${index}`}>
-                            <TableCell className="font-mono text-sm">
-                              {data.address}
+                          <TableRow 
+                            key={`${data.address}-${index}`}
+                            className={`
+                              hover:bg-muted/50 transition-colors duration-150
+                              ${isAlternatingRow ? 'bg-muted/20' : ''}
+                              ${!data.success ? 'bg-red-50 dark:bg-red-950/20' : ''}
+                            `}
+                          >
+                            <TableCell className="font-mono text-sm font-medium">
+                              <div className="flex items-center gap-2">
+                                {preferences.tableStyle.showDataTypeIcons && (
+                                  <div className="w-3 h-3 rounded-full bg-blue-500/20 flex items-center justify-center">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                                  </div>
+                                )}
+                                {data.address}
+                              </div>
                             </TableCell>
-                            <TableCell className="font-mono text-sm">
+                            <TableCell className="font-mono text-sm text-muted-foreground">
                               {data.success ? data.rawValue : '-'}
                             </TableCell>
                             <TableCell className="font-mono text-sm">
                               {data.success ? (
                                 <Tooltip>
                                   <TooltipTrigger>
-                                    <span>{data.displayValue}</span>
+                                    <span className={`
+                                      ${preferences.theme.highlightErrorValues && !data.success ? 'text-red-600' : ''}
+                                      ${data.dataType === 'float32' ? 'text-blue-700 dark:text-blue-400' : ''}
+                                    `}>
+                                      {
+                                        formatNumber(
+                                          data.parsedValue, 
+                                          data.dataType, 
+                                          displayFormat, 
+                                          preferences.numberFormat
+                                        ).display
+                                      }
+                                    </span>
                                   </TooltipTrigger>
                                   <TooltipContent>
                                     <div className="space-y-1">
-                                      <div>十进制: {formatDisplayValue(data.parsedValue, { format: 'dec' })}</div>
-                                      <div>十六进制: {formatDisplayValue(data.parsedValue, { format: 'hex' })}</div>
-                                      <div>二进制: {formatDisplayValue(data.parsedValue, { format: 'bin' })}</div>
+                                      <div className="font-semibold">数据类型: {data.dataType}</div>
+                                      <div>十进制: {formatNumber(data.parsedValue, data.dataType, 'dec', preferences.numberFormat).display}</div>
+                                      <div>十六进制: {formatNumber(data.parsedValue, data.dataType, 'hex', preferences.numberFormat).display}</div>
+                                      <div>二进制: {formatNumber(data.parsedValue, data.dataType, 'bin', preferences.numberFormat).display}</div>
                                     </div>
                                   </TooltipContent>
                                 </Tooltip>
                               ) : (
-                                <span className="text-red-500">错误</span>
+                                <span className="text-red-500 font-medium">错误</span>
                               )}
                             </TableCell>
                             <TableCell className="text-sm">
-                              <Badge variant="outline" className="text-xs">
+                              <Badge 
+                                variant="outline" 
+                                className={`
+                                  text-xs
+                                  ${data.dataType === 'float32' ? 'border-blue-300 text-blue-700 bg-blue-50 dark:bg-blue-950/20' : ''}
+                                  ${data.dataType === 'uint32' || data.dataType === 'int32' ? 'border-purple-300 text-purple-700 bg-purple-50 dark:bg-purple-950/20' : ''}
+                                  ${data.dataType === 'uint16' || data.dataType === 'int16' ? 'border-green-300 text-green-700 bg-green-50 dark:bg-green-950/20' : ''}
+                                `}
+                              >
                                 {matchedRange?.dataType || data.dataType}
                               </Badge>
                             </TableCell>
                             <TableCell className="text-xs text-muted-foreground">
-                              {formatTimestamp(addressResult?.timestamp || batchResult.timestamp)}
+                              <Tooltip>
+                                <TooltipTrigger>
+                                  <span>{formatTime(addressResult?.timestamp || batchResult.timestamp)}</span>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <div className="space-y-1">
+                                    <div>完整时间: {formatTimestamp(addressResult?.timestamp || batchResult.timestamp, { format: 'local', showMilliseconds: true }).display}</div>
+                                    <div>相对时间: {formatTimestamp(addressResult?.timestamp || batchResult.timestamp, { format: 'relative' }).display}</div>
+                                  </div>
+                                </TooltipContent>
+                              </Tooltip>
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="text-center">
                               {data.success ? (
-                                <CheckCircle className="h-4 w-4 text-green-500" />
+                                <CheckCircle className="h-4 w-4 text-green-500 mx-auto" />
                               ) : (
                                 <Tooltip>
                                   <TooltipTrigger>
-                                    <AlertCircle className="h-4 w-4 text-red-500" />
+                                    <AlertCircle className="h-4 w-4 text-red-500 mx-auto" />
                                   </TooltipTrigger>
                                   <TooltipContent>
                                     <p>{data.error || addressResult?.error || '读取失败'}</p>
