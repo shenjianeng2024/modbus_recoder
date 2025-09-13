@@ -15,7 +15,14 @@
       "mcp___magicuidesign_mcp__getComponents",
       "mcp___magicuidesign_mcp__getButtons",
       "Bash(npm run dev:*)",
-      "Bash(npx vite:*)"
+      "Bash(npx vite:*)",
+      "Bash(bash:*)",
+      "Bash(for file in .claude/epics/modbus-reader-bug-fixes/[0-9]*.md)",
+      "Bash(do)",
+      "Bash(done)",
+      "Bash(gh auth:*)",
+      "Bash(gh issue list:*)",
+      "Bash(gh issue create:*)"
     ],
     "deny": [],
     "ask": []
