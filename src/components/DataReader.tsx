@@ -32,6 +32,7 @@ import {
 } from '@/utils/dataParser';
 import { formatTimestamp, formatNumber } from '../utils/formatters';
 import { useUserPreferences } from '../hooks/useUserPreferences';
+import { DisplaySettingsPanel } from './DisplaySettingsPanel';
 import { useErrorHandler } from '@/hooks/useErrorHandler';
 import { notifications } from '@/utils/notifications';
 import { useAddressRangeContext } from '@/contexts/AddressRangeContext';
@@ -233,22 +234,26 @@ export function DataReader({ connectionConfig, disabled = false }: DataReaderPro
                 )}
               </Button>
 
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">格式:</span>
-                <Select
-                  value={displayFormat}
-                  onValueChange={(value: DisplayFormat) => setDisplayFormat(value)}
-                  disabled={readStatus === 'reading'}
-                >
-                  <SelectTrigger className="w-24">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="dec">十进制</SelectItem>
-                    <SelectItem value="hex">十六进制</SelectItem>
-                    <SelectItem value="bin">二进制</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">格式:</span>
+                  <Select
+                    value={displayFormat}
+                    onValueChange={(value: DisplayFormat) => setDisplayFormat(value)}
+                    disabled={readStatus === 'reading'}
+                  >
+                    <SelectTrigger className="w-24">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="dec">十进制</SelectItem>
+                      <SelectItem value="hex">十六进制</SelectItem>
+                      <SelectItem value="bin">二进制</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <DisplaySettingsPanel />
               </div>
             </div>
 
