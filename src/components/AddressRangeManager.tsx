@@ -11,6 +11,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { AddressRangeDialog } from './AddressRangeDialog';
+import { ConfigImportDialog } from './ConfigImportDialog';
 import { useAddressRangeContext } from '../contexts/AddressRangeContext';
 import { ManagedAddressRange } from '../types/modbus';
 import { 
@@ -36,6 +37,7 @@ export const AddressRangeManager: React.FC = () => {
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingRange, setEditingRange] = useState<ManagedAddressRange | undefined>();
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 获取重叠检测结果
@@ -98,26 +100,7 @@ export const AddressRangeManager: React.FC = () => {
 
   // 导入配置
   const handleImport = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const content = e.target?.result as string;
-        const success = importConfig(content);
-        if (success) {
-          alert('配置导入成功！');
-        } else {
-          alert('配置导入失败，请检查文件格式。');
-        }
-      };
-      reader.readAsText(file);
-    }
-    // 清空输入，允许重新选择相同文件
-    event.target.value = '';
+    setImportDialogOpen(true);
   };
 
   // 获取地址段的状态样式
@@ -367,13 +350,10 @@ export const AddressRangeManager: React.FC = () => {
         editingRange={editingRange}
       />
 
-      {/* 隐藏的文件输入 */}
-      <input
-        type="file"
-        ref={fileInputRef}
-        onChange={handleFileChange}
-        accept=".json"
-        style={{ display: 'none' }}
+      {/* 配置导入对话框 */}
+      <ConfigImportDialog
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
       />
     </>
   );
