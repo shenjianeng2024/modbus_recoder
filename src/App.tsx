@@ -121,7 +121,16 @@ function AppContent() {
             <p className="text-muted-foreground text-lg">专业的 Modbus TCP/IP 数据采集工具</p>
           </div>
         
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* 操作引导 - 提升到顶部位置 */}
+        <OperationGuide
+          connectionResult={connectionResult}
+          isConnecting={isLoading}
+          hasEnabledRanges={ranges.filter(range => range.enabled !== false).length > 0}
+          rangesCount={ranges.filter(range => range.enabled !== false).length}
+          className="mb-6 transition-all duration-300 hover:shadow-lg hover:shadow-purple-500/20 hover:scale-[1.02] hover:border-purple-400/50"
+        />
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* 连接配置 */}
           <Card className="border-border/50 bg-background/80 backdrop-blur-sm transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/20 hover:scale-[1.02] hover:border-blue-400/50">
             <CardHeader>
@@ -139,15 +148,6 @@ function AppContent() {
               />
             </CardContent>
           </Card>
-
-          {/* 操作引导 */}
-          <OperationGuide
-            connectionResult={connectionResult}
-            isConnecting={isLoading}
-            hasEnabledRanges={ranges.filter(range => range.enabled !== false).length > 0}
-            rangesCount={ranges.filter(range => range.enabled !== false).length}
-            className="transition-all duration-300 hover:shadow-lg hover:shadow-purple-500/20 hover:scale-[1.02] hover:border-purple-400/50"
-          />
 
           {/* 连接状态 */}
           <Card className="border-border/50 bg-background/80 backdrop-blur-sm transition-all duration-300 hover:shadow-lg hover:shadow-green-500/20 hover:scale-[1.02] hover:border-green-400/50">

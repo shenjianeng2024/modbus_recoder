@@ -32,8 +32,12 @@ export const ConnectionConfig: React.FC<ConnectionConfigProps> = ({
   };
 
   return (
-    <div className="space-y-4 p-4 border rounded-lg">
-      <h3 className="text-lg font-semibold">连接配置</h3>
+    <div className="space-y-4">
+      <div className="text-center mb-4">
+        <p className="text-sm text-muted-foreground">
+          配置 Modbus TCP/IP 设备连接参数
+        </p>
+      </div>
       
       <div className="space-y-2">
         <Label htmlFor="ip">IP 地址</Label>
@@ -59,24 +63,32 @@ export const ConnectionConfig: React.FC<ConnectionConfigProps> = ({
         />
       </div>
 
-      <Button 
-        onClick={handleTestConnection} 
-        disabled={isLoading}
-        className="w-full mt-6 h-12 text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-[1.02] bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 border-2 border-blue-400 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-        size="lg"
-      >
-        {isLoading ? (
-          <>
-            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-            连接中...
-          </>
-        ) : (
-          <>
-            <Wifi className="mr-2 h-5 w-5" />
-            测试连接
-          </>
-        )}
-      </Button>
+      <div className="mt-6 space-y-3">
+        <Button 
+          onClick={handleTestConnection} 
+          disabled={isLoading}
+          className="w-full h-14 text-xl font-bold shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 hover:-translate-y-1 bg-gradient-to-r from-blue-500 via-blue-600 to-indigo-600 hover:from-blue-600 hover:via-blue-700 hover:to-indigo-700 border-2 border-blue-400 disabled:opacity-60 disabled:cursor-not-allowed disabled:transform-none text-white shadow-blue-500/50"
+          size="lg"
+        >
+          {isLoading ? (
+            <>
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white mr-3"></div>
+              正在连接设备...
+            </>
+          ) : (
+            <>
+              <Wifi className="mr-3 h-6 w-6" />
+              测试连接
+            </>
+          )}
+        </Button>
+        
+        <div className="text-center">
+          <p className="text-xs text-muted-foreground">
+            💡 连接成功后即可配置地址段并读取数据
+          </p>
+        </div>
+      </div>
     </div>
   );
 };

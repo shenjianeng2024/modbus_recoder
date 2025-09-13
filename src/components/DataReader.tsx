@@ -17,7 +17,8 @@ import {
   Database,
   TrendingUp,
   AlertTriangle,
-  BarChart3
+  BarChart3,
+  ChevronRight
 } from 'lucide-react';
 
 import { 
@@ -214,67 +215,100 @@ export function DataReader({ connectionConfig, disabled = false }: DataReaderPro
         <CardContent className="space-y-4">
           {/* 操作栏 */}
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button 
-                onClick={handleBatchRead} 
-                disabled={disabled || readStatus === 'reading' || !hasEnabledRanges}
-                className={`h-11 px-6 text-base font-semibold shadow-md hover:shadow-lg transition-all duration-200 ${
-                  disabled || !hasEnabledRanges 
-                    ? 'opacity-50 cursor-not-allowed' 
-                    : 'hover:scale-[1.02]'
-                } ${
-                  !disabled && hasEnabledRanges 
-                    ? 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 border-2 border-green-400' 
-                    : ''
-                }`}
-                size="lg"
-                title={
-                  disabled 
-                    ? '需要先成功连接设备' 
-                    : !hasEnabledRanges 
-                      ? '需要先在地址管理中添加并启用地址段' 
-                      : '点击读取所有启用的地址段数据'
-                }
-              >
-                {readStatus === 'reading' ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    读取中...
-                  </>
-                ) : (
-                  <>
-                    <Play className="mr-2 h-4 w-4" />
-                    立即读取
-                    {!disabled && hasEnabledRanges && (
-                      <span className="ml-2 text-xs opacity-75">
-                        ({enabledRanges.length}段)
-                      </span>
-                    )}
-                  </>
-                )}
-              </Button>
-
+            <div className="flex flex-col gap-3">
+              {/* 主要操作按钮 */}
               <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground">格式:</span>
-                  <Select
-                    value={displayFormat}
-                    onValueChange={(value: DisplayFormat) => setDisplayFormat(value)}
-                    disabled={readStatus === 'reading'}
-                  >
-                    <SelectTrigger className="w-24">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="dec">十进制</SelectItem>
-                      <SelectItem value="hex">十六进制</SelectItem>
-                      <SelectItem value="bin">二进制</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <Button 
+                  onClick={handleBatchRead} 
+                  disabled={disabled || readStatus === 'reading' || !hasEnabledRanges}
+                  className={`h-12 px-8 text-lg font-bold shadow-lg hover:shadow-xl transition-all duration-300 ${
+                    disabled || !hasEnabledRanges 
+                      ? 'opacity-60 cursor-not-allowed transform-none' 
+                      : 'hover:scale-105 hover:-translate-y-1'
+                  } ${
+                    !disabled && hasEnabledRanges 
+                      ? 'bg-gradient-to-r from-green-500 via-green-600 to-emerald-600 hover:from-green-600 hover:via-green-700 hover:to-emerald-700 border-2 border-green-400 text-white shadow-green-500/50' 
+                      : 'bg-gradient-to-r from-gray-400 to-gray-500'
+                  }`}
+                  size="lg"
+                >
+                  {readStatus === 'reading' ? (
+                    <>
+                      <Loader2 className="mr-3 h-5 w-5 animate-spin" />
+                      正在读取数据...
+                    </>
+                  ) : (
+                    <>
+                      <Play className="mr-3 h-5 w-5" />
+                      立即读取数据
+                      {!disabled && hasEnabledRanges && (
+                        <span className="ml-2 px-2 py-1 bg-white/20 rounded-full text-sm font-medium">
+                          {enabledRanges.length}个地址段
+                        </span>
+                      )}
+                    </>
+                  )}
+                </Button>
+
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-muted-foreground">数据格式:</span>
+                    <Select
+                      value={displayFormat}
+                      onValueChange={(value: DisplayFormat) => setDisplayFormat(value)}
+                      disabled={readStatus === 'reading'}
+                    >
+                      <SelectTrigger className="w-28 h-10">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="dec">🔢 十进制</SelectItem>
+                        <SelectItem value="hex">🔠 十六进制</SelectItem>
+                        <SelectItem value="bin">🔡 二进制</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <DisplaySettingsPanel />
                 </div>
-                
-                <DisplaySettingsPanel />
               </div>
+              
+              {/* 状态提示区域 */}
+              {(disabled || !hasEnabledRanges) && (
+                <Alert className={`border-2 ${
+                  disabled ? 'border-amber-300 bg-amber-50 dark:bg-amber-950/20' : 'border-orange-300 bg-orange-50 dark:bg-orange-950/20'
+                }`}>
+                  <AlertTriangle className={`h-5 w-5 ${
+                    disabled ? 'text-amber-600' : 'text-orange-600'
+                  }`} />
+                  <AlertDescription className={`font-medium ${
+                    disabled ? 'text-amber-800 dark:text-amber-200' : 'text-orange-800 dark:text-orange-200'
+                  }`}>
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold">
+                          {disabled ? '⚠️ 需要先连接设备' : '📋 需要配置地址段'}
+                        </span>
+                      </div>
+                      <div className="text-sm">
+                        {disabled 
+                          ? '请先在“连接配置”中点击“测试连接”按钮，确保设备连接成功后再读取数据' 
+                          : '请在下方的“地址范围管理”中添加并启用至少一个地址段'
+                        }
+                      </div>
+                      <div className="flex items-center gap-2 mt-2">
+                        <ChevronRight className="h-4 w-4" />
+                        <span className="text-xs font-medium bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                          {disabled 
+                            ? '操作步骤：连接配置 → 测试连接 → 连接成功' 
+                            : '操作步骤：地址范围管理 → 添加地址段 → 启用地址段'
+                          }
+                        </span>
+                      </div>
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              )}
             </div>
 
             <div className="flex items-center gap-2">

@@ -459,6 +459,35 @@ impl ModbusClient {
         Ok(())
     }
 
+    /// 智能调整32位数据类型的地址范围
+    fn adjust_range_for_32bit_data(range: &AddressRange) -> AddressRange {
+        match range.data_type.as_str() {
+            "float32" | "uint32" | "int32" => {
+                if range.count == 1 {
+                    // 单地址32位数据读取：自动读取2个连续寄存器
+                    debug!(
+                        "检测到单地址{}读取，自动扩展为读取2个寄存器: 地址{}-{}", 
+                        range.data_type, range.start, range.start + 1
+                    );
+                    AddressRange::new_with_type(range.start, 2, &range.data_type)
+                } else {
+                    // 多地址读取：确保是偶数个寄存器
+                    let adjusted_count = if range.count % 2 == 1 {
+                        debug!(
+                            "{}需要偶数个寄存器，从{}调整为{}", 
+                            range.data_type, range.count, range.count + 1
+                        );
+                        range.count + 1
+                    } else {
+                        range.count
+                    };
+                    AddressRange::new_with_type(range.start, adjusted_count, &range.data_type)
+                }
+            }
+            _ => range.clone(), // 其他数据类型不需要调整
+        }
+    }
+
     /// 批量读取多个地址范围并返回详细结果
     pub async fn read_ranges_detailed(&mut self, ranges: Vec<AddressRange>, format: Option<String>) -> Result<BatchReadResult> {
         info!("开始详细读取 {} 个地址范围", ranges.len());
@@ -470,35 +499,50 @@ impl ModbusClient {
         let mut success_count = 0;
         let mut failed_count = 0;
         
-        for (range_idx, range) in ranges.iter().enumerate() {
-            debug!("处理第 {}/{} 个范围: 起始地址={}, 数量={}", 
-                   range_idx + 1, ranges.len(), range.start, range.count);
+        for (range_idx, original_range) in ranges.iter().enumerate() {
+            debug!("处理第 {}/{} 个范围: 起始地址={}, 数量={}, 数据类型={}", 
+                   range_idx + 1, ranges.len(), original_range.start, original_range.count, original_range.data_type);
             
-            match self.read_holding_registers(range.clone()).await {
+            // 智能调整32位数据类型的读取范围
+            let adjusted_range = Self::adjust_range_for_32bit_data(original_range);
+            
+            match self.read_holding_registers(adjusted_range.clone()).await {
                 Ok(read_result) => {
-                    // 根据数据类型处理结果
-                    match range.data_type.as_str() {
+                    // 根据原始请求的数据类型处理结果
+                    match original_range.data_type.as_str() {
                         "float32" | "uint32" | "int32" => {
                             // 对于 32 位数据类型，每两个寄存器组成一个 32 位值
+                            let expected_pairs = if original_range.count == 1 {
+                                1 // 单地址读取只期望1个32位值
+                            } else {
+                                (original_range.count + 1) / 2 // 多地址读取的32位值数量
+                            };
+                            
+                            let mut processed_pairs = 0;
                             for i in (0..read_result.data.len()).step_by(2) {
+                                if processed_pairs >= expected_pairs {
+                                    break; // 已处理完所有期望的32位值
+                                }
+                                
                                 if i + 1 < read_result.data.len() {
-                                    let addr = range.start + i as u16;
+                                    let addr = original_range.start + (processed_pairs * 2) as u16;
                                     let addr_result = Self::create_address_result_with_byte_order(
                                         addr,
                                         read_result.data[i],
                                         format_str,
                                         &timestamp,
                                         None, // 成功读取，无错误
-                                        &range.data_type,
+                                        &original_range.data_type,
                                         Some(read_result.data[i + 1]),
                                         &self.config.byte_order,
                                     );
                                     all_results.push(addr_result);
                                     success_count += 1;
+                                    processed_pairs += 1;
                                 } else {
-                                    // 如果有奇数个数据，最后一个作为 uint16 处理
-                                    let addr = range.start + i as u16;
-                                    let error_msg = format!("{} 需要偶数个寄存器", range.data_type);
+                                    // 理论上不应该到达这里，因为我们已经调整了读取范围
+                                    let addr = original_range.start + (processed_pairs * 2) as u16;
+                                    let error_msg = "数据不完整：缺少配对寄存器".to_string();
                                     let addr_result = Self::create_address_result(
                                         addr,
                                         read_result.data[i],
@@ -510,20 +554,24 @@ impl ModbusClient {
                                     );
                                     all_results.push(addr_result);
                                     failed_count += 1;
+                                    break;
                                 }
                             }
                         }
                         _ => {
                             // 其他数据类型（uint16, int16），每个寄存器单独处理
-                            for (i, &value) in read_result.data.iter().enumerate() {
-                                let addr = range.start + i as u16;
+                            let expected_count = original_range.count as usize;
+                            let actual_count = read_result.data.len().min(expected_count);
+                            
+                            for i in 0..actual_count {
+                                let addr = original_range.start + i as u16;
                                 let addr_result = Self::create_address_result(
                                     addr,
-                                    value,
+                                    read_result.data[i],
                                     format_str,
                                     &timestamp,
                                     None, // 成功读取，无错误
-                                    &range.data_type,
+                                    &original_range.data_type,
                                     None,
                                 );
                                 all_results.push(addr_result);
@@ -531,22 +579,41 @@ impl ModbusClient {
                             }
                         }
                     }
-                    debug!("第 {} 个范围读取成功，获得 {} 个地址", range_idx + 1, read_result.data.len());
+                    debug!("第 {} 个范围读取成功，获得 {} 个寄存器数据", range_idx + 1, read_result.data.len());
                 }
                 Err(e) => {
-                    // 为范围内每个地址创建失败结果
+                    // 为原始范围内的地址创建失败结果
                     let error_msg = e.user_friendly_message();
                     error!("第 {} 个范围读取失败: {}", range_idx + 1, error_msg);
                     
-                    for i in 0..range.count {
-                        let addr = range.start + i;
+                    // 根据数据类型确定失败结果数量
+                    let failure_count = match original_range.data_type.as_str() {
+                        "float32" | "uint32" | "int32" => {
+                            // 32位数据类型：按照用户请求的数量创建失败结果
+                            if original_range.count == 1 {
+                                1 // 单地址读取只失败1个32位值
+                            } else {
+                                (original_range.count + 1) / 2 // 多地址的32位值数量
+                            }
+                        }
+                        _ => original_range.count, // 其他数据类型按寄存器数量
+                    };
+                    
+                    for i in 0..failure_count {
+                        let addr = match original_range.data_type.as_str() {
+                            "float32" | "uint32" | "int32" => {
+                                original_range.start + (i * 2) as u16 // 32位数据的地址间隔
+                            }
+                            _ => original_range.start + i as u16, // 16位数据的地址
+                        };
+                        
                         let addr_result = Self::create_address_result(
                             addr,
                             0, // 失败时使用0作为原始值
                             format_str,
                             &timestamp,
                             Some(error_msg.clone()),
-                            &range.data_type,
+                            &original_range.data_type,
                             None,
                         );
                         all_results.push(addr_result);
@@ -585,6 +652,7 @@ impl Drop for ModbusClient {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::modbus::types::ByteOrder;
 
     #[test]
     fn test_create_address_result_float32() {
@@ -768,6 +836,106 @@ mod tests {
         assert_eq!(result.raw_value, 0x8000);
         assert_eq!(result.parsed_value, "-32768");
         assert_eq!(result.data_type, "int16");
+        assert!(result.success);
+    }
+
+    #[test]
+    fn test_adjust_range_for_32bit_data_single_address() {
+        // 测试单地址32位数据类型的范围调整
+        let float32_range = AddressRange::new_with_type(100, 1, "float32");
+        let adjusted = ModbusClient::adjust_range_for_32bit_data(&float32_range);
+        assert_eq!(adjusted.start, 100);
+        assert_eq!(adjusted.count, 2); // 自动扩展为2个寄存器
+        assert_eq!(adjusted.data_type, "float32");
+
+        let uint32_range = AddressRange::new_with_type(200, 1, "uint32");
+        let adjusted = ModbusClient::adjust_range_for_32bit_data(&uint32_range);
+        assert_eq!(adjusted.start, 200);
+        assert_eq!(adjusted.count, 2);
+        assert_eq!(adjusted.data_type, "uint32");
+
+        let int32_range = AddressRange::new_with_type(300, 1, "int32");
+        let adjusted = ModbusClient::adjust_range_for_32bit_data(&int32_range);
+        assert_eq!(adjusted.start, 300);
+        assert_eq!(adjusted.count, 2);
+        assert_eq!(adjusted.data_type, "int32");
+    }
+
+    #[test]
+    fn test_adjust_range_for_32bit_data_multiple_addresses() {
+        // 测试多地址32位数据类型的范围调整
+        let float32_range = AddressRange::new_with_type(100, 3, "float32"); // 奇数
+        let adjusted = ModbusClient::adjust_range_for_32bit_data(&float32_range);
+        assert_eq!(adjusted.start, 100);
+        assert_eq!(adjusted.count, 4); // 调整为偶数
+        assert_eq!(adjusted.data_type, "float32");
+
+        let uint32_range = AddressRange::new_with_type(200, 4, "uint32"); // 偶数
+        let adjusted = ModbusClient::adjust_range_for_32bit_data(&uint32_range);
+        assert_eq!(adjusted.start, 200);
+        assert_eq!(adjusted.count, 4); // 保持不变
+        assert_eq!(adjusted.data_type, "uint32");
+    }
+
+    #[test]
+    fn test_adjust_range_for_16bit_data_no_change() {
+        // 测试16位数据类型不需要调整
+        let uint16_range = AddressRange::new_with_type(100, 1, "uint16");
+        let adjusted = ModbusClient::adjust_range_for_32bit_data(&uint16_range);
+        assert_eq!(adjusted.start, 100);
+        assert_eq!(adjusted.count, 1); // 保持不变
+        assert_eq!(adjusted.data_type, "uint16");
+
+        let int16_range = AddressRange::new_with_type(200, 5, "int16");
+        let adjusted = ModbusClient::adjust_range_for_32bit_data(&int16_range);
+        assert_eq!(adjusted.start, 200);
+        assert_eq!(adjusted.count, 5); // 保持不变
+        assert_eq!(adjusted.data_type, "int16");
+    }
+
+    #[test]
+    fn test_create_address_result_with_byte_order_little_endian() {
+        // 测试小端序的32位浮点数解析
+        // 42.0的IEEE 754表示：0x42280000
+        // 小端序：低位字节在前，高位字节在后
+        let result = ModbusClient::create_address_result_with_byte_order(
+            100,             // address
+            0x0000,          // 小端序：低位字节在前
+            "dec",           // format
+            "2024-01-01T12:00:00",  // timestamp
+            None,            // error
+            "float32",       // data_type
+            Some(0x4228),    // 小端序：高位字节在后
+            &ByteOrder::LittleEndian,
+        );
+
+        assert_eq!(result.address, 100);
+        assert_eq!(result.raw_value, 0x42280000);
+        assert_eq!(result.parsed_value, "42");
+        assert_eq!(result.data_type, "float32");
+        assert!(result.success);
+    }
+
+    #[test]
+    fn test_create_address_result_with_byte_order_big_endian() {
+        // 测试大端序的32位浮点数解析（默认行为）
+        // 42.0的IEEE 754表示：0x42280000
+        // 大端序：高位字节在前，低位字节在后
+        let result = ModbusClient::create_address_result_with_byte_order(
+            100,             // address
+            0x4228,          // 大端序：高位字节在前
+            "dec",           // format
+            "2024-01-01T12:00:00",  // timestamp
+            None,            // error
+            "float32",       // data_type
+            Some(0x0000),    // 大端序：低位字节在后
+            &ByteOrder::BigEndian,
+        );
+
+        assert_eq!(result.address, 100);
+        assert_eq!(result.raw_value, 0x42280000);
+        assert_eq!(result.parsed_value, "42");
+        assert_eq!(result.data_type, "float32");
         assert!(result.success);
     }
 }
