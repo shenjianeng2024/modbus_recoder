@@ -7,7 +7,7 @@ use log::{debug, error, info, warn};
 
 use crate::modbus::{
     error::{ModbusError, Result},
-    types::{AddressRange, AddressReadResult, BatchReadResult, ConnectionState, ModbusConfig, ReadResult},
+    types::{AddressRange, AddressReadResult, BatchReadResult, ConnectionState, ModbusConfig, ReadResult, ByteOrder},
 };
 
 #[derive(Debug)]
@@ -45,11 +45,43 @@ impl ModbusClient {
         data_type: &str,
         next_value: Option<u16>,
     ) -> AddressReadResult {
+        Self::create_address_result_with_byte_order(
+            address,
+            value,
+            format,
+            timestamp,
+            error,
+            data_type,
+            next_value,
+            &ByteOrder::BigEndian, // 默认大端序保持兼容性
+        )
+    }
+
+    /// 将原始数据转换为AddressReadResult，支持字节序配置
+    pub fn create_address_result_with_byte_order(
+        address: u16,
+        value: u16,
+        format: &str,
+        timestamp: &str,
+        error: Option<String>,
+        data_type: &str,
+        next_value: Option<u16>,
+        byte_order: &ByteOrder,
+    ) -> AddressReadResult {
         let (raw_value, parsed_value, actual_data_type) = match data_type {
             "float32" => {
                 if let Some(next) = next_value {
-                    // IEEE 754 大端序：高位在前，低位在后
-                    let raw_value = ((value as u32) << 16) | (next as u32);
+                    // 根据字节序配置组合32位值
+                    let raw_value = match byte_order {
+                        ByteOrder::BigEndian => {
+                            // 大端序：value为高位，next为低位 (标准Modbus)
+                            ((value as u32) << 16) | (next as u32)
+                        }
+                        ByteOrder::LittleEndian => {
+                            // 小端序：next为高位，value为低位 (某些设备)
+                            ((next as u32) << 16) | (value as u32)
+                        }
+                    };
                     let parsed_value = f32::from_bits(raw_value);
                     (raw_value, parsed_value.to_string(), "float32".to_string())
                 } else {
@@ -58,8 +90,17 @@ impl ModbusClient {
             }
             "uint32" => {
                 if let Some(next) = next_value {
-                    // 大端序：高位在前，低位在后
-                    let raw_value = ((value as u32) << 16) | (next as u32);
+                    // 根据字节序配置组合32位值
+                    let raw_value = match byte_order {
+                        ByteOrder::BigEndian => {
+                            // 大端序：value为高位，next为低位
+                            ((value as u32) << 16) | (next as u32)
+                        }
+                        ByteOrder::LittleEndian => {
+                            // 小端序：next为高位，value为低位
+                            ((next as u32) << 16) | (value as u32)
+                        }
+                    };
                     (raw_value, raw_value.to_string(), "uint32".to_string())
                 } else {
                     (value as u32, Self::format_value(value, format), "uint16".to_string())
@@ -67,8 +108,17 @@ impl ModbusClient {
             }
             "int32" => {
                 if let Some(next) = next_value {
-                    // 大端序：高位在前，低位在后
-                    let raw_value = ((value as u32) << 16) | (next as u32);
+                    // 根据字节序配置组合32位值
+                    let raw_value = match byte_order {
+                        ByteOrder::BigEndian => {
+                            // 大端序：value为高位，next为低位
+                            ((value as u32) << 16) | (next as u32)
+                        }
+                        ByteOrder::LittleEndian => {
+                            // 小端序：next为高位，value为低位
+                            ((next as u32) << 16) | (value as u32)
+                        }
+                    };
                     let parsed_value = raw_value as i32;
                     (raw_value as u32, parsed_value.to_string(), "int32".to_string())
                 } else {
@@ -433,7 +483,7 @@ impl ModbusClient {
                             for i in (0..read_result.data.len()).step_by(2) {
                                 if i + 1 < read_result.data.len() {
                                     let addr = range.start + i as u16;
-                                    let addr_result = Self::create_address_result(
+                                    let addr_result = Self::create_address_result_with_byte_order(
                                         addr,
                                         read_result.data[i],
                                         format_str,
@@ -441,6 +491,7 @@ impl ModbusClient {
                                         None, // 成功读取，无错误
                                         &range.data_type,
                                         Some(read_result.data[i + 1]),
+                                        &self.config.byte_order,
                                     );
                                     all_results.push(addr_result);
                                     success_count += 1;

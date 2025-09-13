@@ -1,11 +1,28 @@
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum ByteOrder {
+    /// 高位在前，低位在后 (标准Modbus)
+    BigEndian,
+    /// 低位在前，高位在后 (某些设备)
+    LittleEndian,
+}
+
+impl Default for ByteOrder {
+    fn default() -> Self {
+        ByteOrder::BigEndian  // 默认使用大端序，符合Modbus标准
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModbusConfig {
     pub ip: String,
     pub port: u16,
     pub timeout_ms: u32,
     pub slave_id: u8,
+    /// 32位数据的字节序配置
+    #[serde(default)]
+    pub byte_order: ByteOrder,
 }
 
 impl Default for ModbusConfig {
@@ -15,6 +32,7 @@ impl Default for ModbusConfig {
             port: 502,
             timeout_ms: 3000,
             slave_id: 1,
+            byte_order: ByteOrder::default(),
         }
     }
 }
