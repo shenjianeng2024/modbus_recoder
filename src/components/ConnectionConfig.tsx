@@ -8,11 +8,13 @@ import { Wifi } from 'lucide-react';
 interface ConnectionConfigProps {
   onConfigChange: (config: ConnectionConfigType) => void;
   onTestConnection: (config: ConnectionConfigType) => void;
+  isLoading?: boolean;
 }
 
 export const ConnectionConfig: React.FC<ConnectionConfigProps> = ({
   onConfigChange,
   onTestConnection,
+  isLoading = false,
 }) => {
   const [config, setConfig] = useState<ConnectionConfigType>({
     ip: '192.168.1.199',
@@ -59,11 +61,21 @@ export const ConnectionConfig: React.FC<ConnectionConfigProps> = ({
 
       <Button 
         onClick={handleTestConnection} 
-        className="w-full mt-6 h-12 text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-[1.02] bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 border-2 border-blue-400"
+        disabled={isLoading}
+        className="w-full mt-6 h-12 text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-[1.02] bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 border-2 border-blue-400 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
         size="lg"
       >
-        <Wifi className="mr-2 h-5 w-5" />
-        测试连接
+        {isLoading ? (
+          <>
+            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+            连接中...
+          </>
+        ) : (
+          <>
+            <Wifi className="mr-2 h-5 w-5" />
+            测试连接
+          </>
+        )}
       </Button>
     </div>
   );

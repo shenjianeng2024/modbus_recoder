@@ -218,8 +218,23 @@ export function DataReader({ connectionConfig, disabled = false }: DataReaderPro
               <Button 
                 onClick={handleBatchRead} 
                 disabled={disabled || readStatus === 'reading' || !hasEnabledRanges}
-                className="h-11 px-6 text-base font-semibold shadow-md hover:shadow-lg transition-all duration-200"
+                className={`h-11 px-6 text-base font-semibold shadow-md hover:shadow-lg transition-all duration-200 ${
+                  disabled || !hasEnabledRanges 
+                    ? 'opacity-50 cursor-not-allowed' 
+                    : 'hover:scale-[1.02]'
+                } ${
+                  !disabled && hasEnabledRanges 
+                    ? 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 border-2 border-green-400' 
+                    : ''
+                }`}
                 size="lg"
+                title={
+                  disabled 
+                    ? '需要先成功连接设备' 
+                    : !hasEnabledRanges 
+                      ? '需要先在地址管理中添加并启用地址段' 
+                      : '点击读取所有启用的地址段数据'
+                }
               >
                 {readStatus === 'reading' ? (
                   <>
@@ -230,6 +245,11 @@ export function DataReader({ connectionConfig, disabled = false }: DataReaderPro
                   <>
                     <Play className="mr-2 h-4 w-4" />
                     立即读取
+                    {!disabled && hasEnabledRanges && (
+                      <span className="ml-2 text-xs opacity-75">
+                        ({enabledRanges.length}段)
+                      </span>
+                    )}
                   </>
                 )}
               </Button>
