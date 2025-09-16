@@ -5,6 +5,7 @@ import { AddressRangeManager } from './components/AddressRangeManager';
 import { DataReader } from './components/DataReader';
 import { BatchCollection } from './components/BatchCollection';
 import { OperationGuide } from './components/OperationGuide';
+import { DebugPanel } from './components/DebugPanel';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { ConnectionConfig as ConnectionConfigType, ConnectionResult } from './types/modbus';
@@ -233,6 +234,11 @@ function AppContent() {
             </div>
           </CardContent>
         </Card>
+        </div>
+
+        {/* 调试面板 */}
+        <div className="mt-8">
+          <DebugPanel />
         </div>
       </div>
     </TooltipProvider>

@@ -23,7 +23,15 @@
       "Bash(gh auth:*)",
       "Bash(gh issue list:*)",
       "Bash(gh issue create:*)",
-      "mcp__sequential-thinking__sequentialthinking"
+      "mcp__sequential-thinking__sequentialthinking",
+      "mcp__morphllm-fast-apply__read_multiple_files",
+      "Bash(rm:*)",
+      "Bash(mv:*)",
+      "Bash(xargs rm:*)",
+      "Bash(ping:*)",
+      "Bash(nc:*)",
+      "Bash(cargo:*)",
+      "WebFetch(domain:docs.rs)"
     ],
     "deny": [],
     "ask": []

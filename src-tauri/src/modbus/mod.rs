@@ -3,6 +3,7 @@ pub mod client_tests;
 pub mod error;
 pub mod manager;
 pub mod types;
+pub mod system_proxy;
 
 pub use client::ModbusClient;
 pub use error::{ModbusError, Result};

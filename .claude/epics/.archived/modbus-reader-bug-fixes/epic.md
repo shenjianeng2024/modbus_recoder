@@ -1,12 +1,13 @@
 ---
 last_sync: 2025-09-10T07:25:01Z
 name: modbus-reader-bug-fixes
-status: planning
+status: completed
 created: 2025-09-10T04:35:57Z
-progress: 0%
+progress: 100%
 prd: .claude/prds/modbus-reader-bug-fixes.md
 github: https://github.com/shenjianeng2024/modbus_recoder/issues/12
-updated: 2025-09-13T05:56:11Z
+updated: 2025-09-13T14:48:31Z
+completed: 2025-09-13T14:48:31Z
 ---
 
 # Epic: Modbus Reader Bug Fixes

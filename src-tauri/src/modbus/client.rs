@@ -8,6 +8,7 @@ use log::{debug, error, info, warn};
 use crate::modbus::{
     error::{ModbusError, Result},
     types::{AddressRange, AddressReadResult, BatchReadResult, ConnectionState, ModbusConfig, ReadResult, ByteOrder},
+    system_proxy::SystemTcpProxy,
 };
 
 #[derive(Debug)]
@@ -15,6 +16,8 @@ pub struct ModbusClient {
     context: Option<Context>,
     config: ModbusConfig,
     state: ConnectionState,
+    system_proxy: Option<SystemTcpProxy>,
+    use_system_proxy: bool,
 }
 
 impl ModbusClient {
@@ -23,6 +26,8 @@ impl ModbusClient {
             context: None,
             config: ModbusConfig::default(),
             state: ConnectionState::Disconnected,
+            system_proxy: None,
+            use_system_proxy: false,
         }
     }
     
@@ -151,6 +156,8 @@ impl ModbusClient {
             context: None,
             config,
             state: ConnectionState::Disconnected,
+            system_proxy: None,
+            use_system_proxy: false,
         }
     }
 
@@ -197,34 +204,64 @@ impl ModbusClient {
 
         // 创建 TCP 连接，设置从站ID
         debug!("正在建立 TCP 连接，超时时间: {}ms", self.config.timeout_ms);
-        match timeout(
+        debug!("目标地址: {}, 从站ID: {}", socket_addr, self.config.slave_id);
+
+        // 首先尝试正常的tokio-modbus连接
+        let tokio_result = timeout(
             Duration::from_millis(self.config.timeout_ms as u64),
-            tcp::connect_slave(socket_addr, Slave(self.config.slave_id)),
+            tcp::connect(socket_addr),
         )
-        .await
-        {
+        .await;
+
+        // 如果tokio连接失败，尝试系统代理
+        match tokio_result {
             Ok(Ok(context)) => {
                 self.context = Some(context);
                 self.state = ConnectionState::Connected;
                 info!("成功连接到 Modbus 设备: {}:{} (从站ID: {})", ip, port, self.config.slave_id);
-                
+
                 // 尝试测试连接
                 if let Err(e) = self.test_connection().await {
                     warn!("连接测试失败: {}", e.user_friendly_message());
                 }
-                
+
                 Ok(())
             }
             Ok(Err(e)) => {
-                let error_msg = format!("Connection failed: {}", e);
+                // 详细记录连接错误，便于调试
+                error!("TCP连接失败，目标: {}, 错误详情: {:?}", socket_addr, e);
+
+                // 检查是否是"No route to host"错误，如果是则尝试系统代理
+                let error_str = format!("{}", e);
+                if error_str.contains("No route to host") {
+                    warn!("检测到网络路由问题，尝试使用系统代理连接...");
+                    return self.try_system_proxy_connection(ip, port).await;
+                }
+
+                // 分析其他错误原因并提供友好的错误信息
+                let error_msg = {
+                    if error_str.contains("Connection refused") {
+                        format!("连接被拒绝: 设备{}:{}可能未启动Modbus服务或端口错误", ip, port)
+                    } else if error_str.contains("timed out") || error_str.contains("timeout") {
+                        format!("连接超时: 设备{}:{}响应超时，请检查网络或增加超时时间", ip, port)
+                    } else if error_str.contains("Permission denied") {
+                        format!("权限拒绝: 无法访问设备{}:{}，可能需要管理员权限", ip, port)
+                    } else if error_str.contains("Network is unreachable") {
+                        format!("网络不可达: 无法连接到{}，请检查网络配置", ip)
+                    } else {
+                        format!("连接失败: {} (目标: {}:{})", e, ip, port)
+                    }
+                };
+
                 self.state = ConnectionState::Error(error_msg.clone());
                 let error = ModbusError::ConnectionFailed(error_msg);
                 error!("连接失败: {}", error.user_friendly_message());
                 Err(error)
             }
             Err(_) => {
-                self.state = ConnectionState::Error("Connection timeout".to_string());
-                let error = ModbusError::Timeout;
+                let timeout_msg = format!("连接超时: {}ms内未能连接到{}:{}", self.config.timeout_ms, ip, port);
+                self.state = ConnectionState::Error(timeout_msg.clone());
+                let error = ModbusError::ConnectionFailed(timeout_msg);
                 error!("连接超时: {}", error.user_friendly_message());
                 Err(error)
             }
@@ -327,54 +364,79 @@ impl ModbusClient {
     }
 
     async fn read_holding_registers_raw(&mut self, start: u16, count: u16) -> Result<Vec<u16>> {
-        let context = self.context.as_mut().ok_or(ModbusError::NotConnected)?;
-        
-        debug!("执行原始寄存器读取: start={}, count={}, timeout={}ms", 
+        debug!("执行原始寄存器读取: start={}, count={}, timeout={}ms",
                start, count, self.config.timeout_ms);
 
-        // 添加超时处理，正确处理三层嵌套的 Result
-        match timeout(
-            Duration::from_millis(self.config.timeout_ms as u64),
-            context.read_holding_registers(start, count),
-        )
-        .await
-        {
-            Ok(transport_result) => {
-                // timeout success - now handle transport result
-                match transport_result {
-                    Ok(modbus_result) => {
-                        // transport success - now handle modbus result
-                        match modbus_result {
-                            Ok(data) => {
-                                debug!("原始读取成功: 获得 {} 个数据值", data.len());
-                                Ok(data)
-                            }
-                            Err(exception) => {
-                                let error_msg = format!("Modbus exception: {}", exception);
-                                warn!("Modbus协议异常: {}", error_msg);
-                                self.state = ConnectionState::Error(error_msg.clone());
-                                Err(ModbusError::DeviceError(error_msg))
-                            }
-                        }
+        // 检查是否需要使用系统代理
+        if self.use_system_proxy {
+            if let Some(proxy) = &self.system_proxy {
+                debug!("使用系统代理进行寄存器读取");
+                match proxy.read_holding_registers(self.config.slave_id, start, count).await {
+                    Ok(data) => {
+                        debug!("系统代理读取成功: 获得 {} 个数据值", data.len());
+                        Ok(data)
                     }
                     Err(e) => {
-                        let error_msg = format!("Transport error: {}", e);
-                        warn!("传输层错误: {}", error_msg);
+                        let error_msg = format!("系统代理读取失败: {}", e);
+                        warn!("{}", error_msg);
                         self.state = ConnectionState::Error(error_msg.clone());
                         Err(ModbusError::DeviceError(error_msg))
                     }
                 }
+            } else {
+                let error_msg = "系统代理未初始化".to_string();
+                error!("{}", error_msg);
+                Err(ModbusError::DeviceError(error_msg))
             }
-            Err(_) => {
-                warn!("读取操作超时 ({}ms)", self.config.timeout_ms);
-                self.state = ConnectionState::Error("Read timeout".to_string());
-                Err(ModbusError::Timeout)
+        } else {
+            // 使用常规tokio-modbus连接
+            let context = self.context.as_mut().ok_or(ModbusError::NotConnected)?;
+
+            // 添加超时处理，正确处理三层嵌套的 Result
+            match timeout(
+                Duration::from_millis(self.config.timeout_ms as u64),
+                context.read_holding_registers(start, count),
+            )
+            .await
+            {
+                Ok(transport_result) => {
+                    // timeout success - now handle transport result
+                    match transport_result {
+                        Ok(modbus_result) => {
+                            // transport success - now handle modbus result
+                            match modbus_result {
+                                Ok(data) => {
+                                    debug!("原始读取成功: 获得 {} 个数据值", data.len());
+                                    Ok(data)
+                                }
+                                Err(exception) => {
+                                    let error_msg = format!("Modbus exception: {}", exception);
+                                    warn!("Modbus协议异常: {}", error_msg);
+                                    self.state = ConnectionState::Error(error_msg.clone());
+                                    Err(ModbusError::DeviceError(error_msg))
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            let error_msg = format!("Transport error: {}", e);
+                            warn!("传输层错误: {}", error_msg);
+                            self.state = ConnectionState::Error(error_msg.clone());
+                            Err(ModbusError::DeviceError(error_msg))
+                        }
+                    }
+                }
+                Err(_) => {
+                    warn!("读取操作超时 ({}ms)", self.config.timeout_ms);
+                    self.state = ConnectionState::Error("Read timeout".to_string());
+                    Err(ModbusError::Timeout)
+                }
             }
         }
     }
 
     pub fn is_connected(&self) -> bool {
-        matches!(self.state, ConnectionState::Connected) && self.context.is_some()
+        matches!(self.state, ConnectionState::Connected) &&
+        (self.context.is_some() || (self.use_system_proxy && self.system_proxy.is_some()))
     }
 
     pub fn get_state(&self) -> &ConnectionState {
@@ -639,6 +701,35 @@ impl ModbusClient {
             timestamp,
             duration_ms: duration.as_millis() as u64,
         })
+    }
+
+    /// 尝试使用系统代理连接（绕过Rust网络栈问题）
+    async fn try_system_proxy_connection(&mut self, ip: &str, port: u16) -> Result<()> {
+        info!("尝试使用系统代理连接到 {}:{}", ip, port);
+
+        // 创建系统代理实例
+        let proxy = SystemTcpProxy::new(ip, port);
+
+        // 先测试系统级连接
+        match proxy.test_connection().await {
+            Ok(msg) => {
+                info!("系统代理连接测试成功: {}", msg);
+
+                // 存储系统代理实例并设置标志
+                self.system_proxy = Some(proxy);
+                self.use_system_proxy = true;
+                self.state = ConnectionState::Connected;
+
+                info!("成功通过系统代理连接到 Modbus 设备: {}:{}", ip, port);
+                Ok(())
+            }
+            Err(e) => {
+                let error_msg = format!("系统代理连接也失败: {}", e);
+                error!("{}", error_msg);
+                self.state = ConnectionState::Error(error_msg.clone());
+                Err(ModbusError::ConnectionFailed(error_msg))
+            }
+        }
     }
 }
 

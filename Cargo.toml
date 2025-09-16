@@ -1,0 +1,11 @@
+[package]
+name = "modbus_test"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "test_modbus_standalone"
+path = "test_modbus_standalone.rs"
+
+[dependencies]
+tokio = { version = "1.0", features = ["full"] }

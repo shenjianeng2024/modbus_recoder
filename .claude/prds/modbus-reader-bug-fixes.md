@@ -1,7 +1,7 @@
 ---
 name: modbus-reader-bug-fixes
 description: 修复Modbus读取器中的关键bug，包括浮点数解析、地址段导出、数据显示格式和用户引导逻辑问题
-status: backlog
+status: complete
 created: 2025-09-10T04:24:55Z
 ---
 
