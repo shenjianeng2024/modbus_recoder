@@ -1,0 +1,40 @@
+{
+  "version": "1.0",
+  "export_date": "2025-09-13T07:04:00Z",
+  "description": "测试用Modbus地址段配置文件",
+  "address_ranges": [
+    {
+      "name": "温度传感器组1",
+      "start_address": 40001,
+      "count": 10,
+      "data_type": "float32",
+      "description": "锅炉温度传感器读数",
+      "enabled": true,
+      "polling_interval": 1000
+    },
+    {
+      "name": "压力表读数",
+      "start_address": 40011,
+      "count": 5,
+      "data_type": "uint16",
+      "description": "系统压力表读数",
+      "enabled": true,
+      "polling_interval": 2000
+    },
+    {
+      "name": "状态位信息",
+      "start_address": 40020,
+      "count": 8,
+      "data_type": "uint16",
+      "description": "设备状态位信息",
+      "enabled": false,
+      "polling_interval": 500
+    }
+  ],
+  "metadata": {
+    "total_ranges": 3,
+    "total_addresses": 23,
+    "enabled_ranges": 2,
+    "export_tool": "Modbus Recorder v1.0 Test"
+  }
+}
