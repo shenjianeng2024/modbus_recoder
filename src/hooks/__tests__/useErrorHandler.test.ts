@@ -323,26 +323,30 @@ describe('useAsyncErrorHandler Hook', () => {
       new Promise(resolve => setTimeout(() => resolve('data'), 100))
     )
     
+    let executePromise: Promise<any>
     act(() => {
-      result.current.execute(mockOperation)
+      executePromise = result.current.execute(mockOperation)
     })
     
     expect(result.current.loading).toBe(true)
     
     await act(async () => {
-      vi.runAllTimers()
+      vi.advanceTimersByTime(100)
+      await executePromise
     })
     
     expect(result.current.loading).toBe(false)
   })
 
-  it('应该能够重置状态', () => {
+  it('应该能够重置状态', async () => {
     const { result } = renderHook(() => useAsyncErrorHandler<string>())
     
-    act(() => {
-      // 手动设置一些状态来测试重置
-      result.current.execute(() => Promise.resolve('test data'))
+    // 首先执行一个操作来设置一些状态
+    await act(async () => {
+      await result.current.execute(() => Promise.resolve('test data'))
     })
+    
+    expect(result.current.data).toBe('test data')
     
     act(() => {
       result.current.reset()

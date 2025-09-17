@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
-use std::thread;
+// use std::thread;
 use std::time::Duration;
 use tokio::net::TcpListener;
 use tokio_modbus::{prelude::*, server::tcp::Server};
@@ -33,7 +33,7 @@ impl MockModbusServer {
         self.port = addr.port();
 
         let registers = Arc::clone(&self.registers);
-        
+
         let handle = tokio::spawn(async move {
             let service = MockModbusService::new(registers);
             let server = Server::new(listener);
@@ -43,10 +43,10 @@ impl MockModbusServer {
         });
 
         self.server_handle = Some(handle);
-        
+
         // 等待服务器启动
         tokio::time::sleep(Duration::from_millis(100)).await;
-        
+
         Ok(())
     }
 
@@ -126,25 +126,25 @@ impl tokio_modbus::server::Service for MockModbusService {
             Request::ReadHoldingRegisters(addr, cnt) => {
                 let registers = self.registers.lock().unwrap();
                 let mut values = Vec::new();
-                
+
                 for i in 0..cnt {
                     let reg_addr = addr + i;
                     let value = registers.get(&reg_addr).copied().unwrap_or(0);
                     values.push(value);
                 }
-                
+
                 Response::ReadHoldingRegisters(values)
             }
             Request::ReadInputRegisters(addr, cnt) => {
                 let registers = self.registers.lock().unwrap();
                 let mut values = Vec::new();
-                
+
                 for i in 0..cnt {
                     let reg_addr = addr + i;
                     let value = registers.get(&reg_addr).copied().unwrap_or(0);
                     values.push(value);
                 }
-                
+
                 Response::ReadInputRegisters(values)
             }
             Request::WriteSingleRegister(addr, value) => {
@@ -227,12 +227,12 @@ mod tests {
     #[tokio::test]
     async fn test_mock_server_start_stop() {
         let mut server = MockModbusServer::new();
-        
+
         // 启动服务器
         assert!(server.start().await.is_ok());
         assert!(server.port() > 0);
         assert!(server.addr().is_some());
-        
+
         // 停止服务器
         server.stop().await;
     }
@@ -240,19 +240,19 @@ mod tests {
     #[tokio::test]
     async fn test_mock_server_register_operations() {
         let server = MockModbusServer::new();
-        
+
         // 测试设置和获取单个寄存器
         server.set_register(100, 1234);
         assert_eq!(server.get_register(100), Some(1234));
-        
+
         // 测试设置多个寄存器
         let values = [100, 200, 300];
         server.set_registers(200, &values);
-        
+
         assert_eq!(server.get_register(200), Some(100));
         assert_eq!(server.get_register(201), Some(200));
         assert_eq!(server.get_register(202), Some(300));
-        
+
         // 测试清空寄存器
         server.clear_registers();
         assert_eq!(server.get_register(100), None);
@@ -263,7 +263,7 @@ mod tests {
     fn test_utils_generate_test_registers() {
         let registers = utils::generate_test_registers(100, 5);
         assert_eq!(registers.len(), 5);
-        
+
         for i in 0..5 {
             assert!(registers.contains_key(&(100 + i)));
         }
@@ -282,7 +282,7 @@ mod tests {
     fn test_utils_assert_registers_equal() {
         let expected = [100, 200, 300];
         let actual = [100, 200, 300];
-        
+
         utils::assert_registers_equal(&expected, &actual);
     }
 
@@ -291,7 +291,7 @@ mod tests {
     fn test_utils_assert_registers_equal_different_lengths() {
         let expected = [100, 200];
         let actual = [100, 200, 300];
-        
+
         utils::assert_registers_equal(&expected, &actual);
     }
 
@@ -300,7 +300,7 @@ mod tests {
     fn test_utils_assert_registers_equal_different_values() {
         let expected = [100, 200];
         let actual = [100, 300];
-        
+
         utils::assert_registers_equal(&expected, &actual);
     }
 }

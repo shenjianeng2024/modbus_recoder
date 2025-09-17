@@ -1,9 +1,9 @@
+use log::{debug, info, warn};
 use std::sync::Arc;
 use tauri::State;
 use tokio::sync::Mutex;
-use log::{debug, info, warn};
 
-use crate::modbus::{AddressRange, ConnectionState, ModbusClient, ReadResult, ModbusConfig};
+use crate::modbus::{AddressRange, ConnectionState, ModbusClient, ModbusConfig, ReadResult};
 
 pub type ModbusManager = Arc<Mutex<ModbusClient>>;
 
@@ -123,7 +123,10 @@ pub async fn modbus_set_config(
     timeout_ms: u32,
     slave_id: u8,
 ) -> Result<String, String> {
-    info!("前端请求更新配置: 超时={}ms, 从站ID={}", timeout_ms, slave_id);
+    info!(
+        "前端请求更新配置: 超时={}ms, 从站ID={}",
+        timeout_ms, slave_id
+    );
     let mut client = state.modbus.lock().await;
 
     // 验证配置
@@ -149,7 +152,7 @@ pub async fn modbus_read_multiple_ranges(
 ) -> Result<Vec<ReadResult>, String> {
     info!("前端请求批量读取 {} 个地址范围", ranges.len());
     let mut client = state.modbus.lock().await;
-    
+
     let address_ranges: Vec<AddressRange> = ranges
         .into_iter()
         .map(|(start, count)| AddressRange::new(start, count))
@@ -189,7 +192,7 @@ pub async fn modbus_get_config(state: State<'_, AppState>) -> Result<ModbusConfi
 pub async fn modbus_validate_config(state: State<'_, AppState>) -> Result<String, String> {
     debug!("前端请求验证配置");
     let client = state.modbus.lock().await;
-    
+
     match client.validate_config() {
         Ok(_) => Ok("配置有效".to_string()),
         Err(e) => Err(e.user_friendly_message()),

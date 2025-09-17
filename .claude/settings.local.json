@@ -23,7 +23,21 @@
       "Bash(gh auth:*)",
       "Bash(gh issue list:*)",
       "Bash(gh issue create:*)",
-      "Bash(git merge:*)"
+      "Bash(git merge:*)",
+      "mcp__sequential-thinking__sequentialthinking",
+      "mcp__morphllm-fast-apply__read_multiple_files",
+      "Bash(rm:*)",
+      "Bash(mv:*)",
+      "Bash(xargs rm:*)",
+      "Bash(ping:*)",
+      "Bash(nc:*)",
+      "Bash(cargo:*)",
+      "WebFetch(domain:docs.rs)",
+      "Bash(npm run format:*)",
+      "Bash(npm test:*)",
+      "Bash(xargs kill:*)",
+      "Bash(awk:*)",
+      "Bash(git pull:*)"
     ],
     "deny": [],
     "ask": []

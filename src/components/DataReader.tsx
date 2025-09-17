@@ -17,7 +17,8 @@ import {
   Database,
   TrendingUp,
   AlertTriangle,
-  BarChart3
+  BarChart3,
+  ChevronRight
 } from 'lucide-react';
 
 import { 
@@ -28,9 +29,11 @@ import {
 } from '@/types/modbus';
 import { 
   convertBatchResult, 
-  formatDisplayValue, 
   validateReadResult 
 } from '@/utils/dataParser';
+import { formatTimestamp, formatNumber } from '../utils/formatters';
+import { useUserPreferences } from '../hooks/useUserPreferences';
+import { DisplaySettingsPanel } from './DisplaySettingsPanel';
 import { useErrorHandler } from '@/hooks/useErrorHandler';
 import { notifications } from '@/utils/notifications';
 import { useAddressRangeContext } from '@/contexts/AddressRangeContext';
@@ -50,6 +53,7 @@ export function DataReader({ connectionConfig, disabled = false }: DataReaderPro
   const [showResultDialog, setShowResultDialog] = useState(false);
 
   const { ranges, refreshTrigger } = useAddressRangeContext();
+  const { preferences } = useUserPreferences();
   const { handleError } = useErrorHandler({
     showNotifications: true,
     maxErrors: 10,
@@ -151,20 +155,10 @@ export function DataReader({ connectionConfig, disabled = false }: DataReaderPro
     }
   };
 
-  // 格式化时间戳
-  const formatTimestamp = (timestamp: string) => {
-    try {
-      return new Date(timestamp).toLocaleString('zh-CN', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit'
-      });
-    } catch {
-      return timestamp;
-    }
+  // 使用新的时间格式化函数
+  const formatTime = (timestamp: string) => {
+    const formatted = formatTimestamp(timestamp, preferences.timeFormat);
+    return formatted.display;
   };
 
   // 获取状态指示器内容
@@ -221,43 +215,100 @@ export function DataReader({ connectionConfig, disabled = false }: DataReaderPro
         <CardContent className="space-y-4">
           {/* 操作栏 */}
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button 
-                onClick={handleBatchRead} 
-                disabled={disabled || readStatus === 'reading' || !hasEnabledRanges}
-                className="h-11 px-6 text-base font-semibold shadow-md hover:shadow-lg transition-all duration-200"
-                size="lg"
-              >
-                {readStatus === 'reading' ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    读取中...
-                  </>
-                ) : (
-                  <>
-                    <Play className="mr-2 h-4 w-4" />
-                    立即读取
-                  </>
-                )}
-              </Button>
-
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">格式:</span>
-                <Select
-                  value={displayFormat}
-                  onValueChange={(value: DisplayFormat) => setDisplayFormat(value)}
-                  disabled={readStatus === 'reading'}
+            <div className="flex flex-col gap-3">
+              {/* 主要操作按钮 */}
+              <div className="flex items-center gap-4">
+                <Button 
+                  onClick={handleBatchRead} 
+                  disabled={disabled || readStatus === 'reading' || !hasEnabledRanges}
+                  className={`h-12 px-8 text-lg font-bold shadow-lg hover:shadow-xl transition-all duration-300 ${
+                    disabled || !hasEnabledRanges 
+                      ? 'opacity-60 cursor-not-allowed transform-none' 
+                      : 'hover:scale-105 hover:-translate-y-1'
+                  } ${
+                    !disabled && hasEnabledRanges 
+                      ? 'bg-gradient-to-r from-green-500 via-green-600 to-emerald-600 hover:from-green-600 hover:via-green-700 hover:to-emerald-700 border-2 border-green-400 text-white shadow-green-500/50' 
+                      : 'bg-gradient-to-r from-gray-400 to-gray-500'
+                  }`}
+                  size="lg"
                 >
-                  <SelectTrigger className="w-24">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="dec">十进制</SelectItem>
-                    <SelectItem value="hex">十六进制</SelectItem>
-                    <SelectItem value="bin">二进制</SelectItem>
-                  </SelectContent>
-                </Select>
+                  {readStatus === 'reading' ? (
+                    <>
+                      <Loader2 className="mr-3 h-5 w-5 animate-spin" />
+                      正在读取数据...
+                    </>
+                  ) : (
+                    <>
+                      <Play className="mr-3 h-5 w-5" />
+                      立即读取数据
+                      {!disabled && hasEnabledRanges && (
+                        <span className="ml-2 px-2 py-1 bg-white/20 rounded-full text-sm font-medium">
+                          {enabledRanges.length}个地址段
+                        </span>
+                      )}
+                    </>
+                  )}
+                </Button>
+
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-muted-foreground">数据格式:</span>
+                    <Select
+                      value={displayFormat}
+                      onValueChange={(value: DisplayFormat) => setDisplayFormat(value)}
+                      disabled={readStatus === 'reading'}
+                    >
+                      <SelectTrigger className="w-28 h-10">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="dec">🔢 十进制</SelectItem>
+                        <SelectItem value="hex">🔠 十六进制</SelectItem>
+                        <SelectItem value="bin">🔡 二进制</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <DisplaySettingsPanel />
+                </div>
               </div>
+              
+              {/* 状态提示区域 */}
+              {(disabled || !hasEnabledRanges) && (
+                <Alert className={`border-2 ${
+                  disabled ? 'border-amber-300 bg-amber-50 dark:bg-amber-950/20' : 'border-orange-300 bg-orange-50 dark:bg-orange-950/20'
+                }`}>
+                  <AlertTriangle className={`h-5 w-5 ${
+                    disabled ? 'text-amber-600' : 'text-orange-600'
+                  }`} />
+                  <AlertDescription className={`font-medium ${
+                    disabled ? 'text-amber-800 dark:text-amber-200' : 'text-orange-800 dark:text-orange-200'
+                  }`}>
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold">
+                          {disabled ? '⚠️ 需要先连接设备' : '📋 需要配置地址段'}
+                        </span>
+                      </div>
+                      <div className="text-sm">
+                        {disabled 
+                          ? '请先在“连接配置”中点击“测试连接”按钮，确保设备连接成功后再读取数据' 
+                          : '请在下方的“地址范围管理”中添加并启用至少一个地址段'
+                        }
+                      </div>
+                      <div className="flex items-center gap-2 mt-2">
+                        <ChevronRight className="h-4 w-4" />
+                        <span className="text-xs font-medium bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                          {disabled 
+                            ? '操作步骤：连接配置 → 测试连接 → 连接成功' 
+                            : '操作步骤：地址范围管理 → 添加地址段 → 启用地址段'
+                          }
+                        </span>
+                      </div>
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              )}
             </div>
 
             <div className="flex items-center gap-2">
@@ -356,16 +407,16 @@ export function DataReader({ connectionConfig, disabled = false }: DataReaderPro
                 </div>
 
                 {/* 结果表格 */}
-                <div className="rounded-md border">
+                <div className="rounded-md border overflow-hidden">
                   <Table>
                     <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-20">地址</TableHead>
-                        <TableHead className="w-24">原始值</TableHead>
-                        <TableHead className="w-32">解析值</TableHead>
-                        <TableHead className="w-24">类型</TableHead>
-                        <TableHead className="w-40">时间戳</TableHead>
-                        <TableHead className="w-20">状态</TableHead>
+                      <TableRow className="bg-muted/50">
+                        <TableHead className="w-20 font-semibold">地址</TableHead>
+                        <TableHead className="w-24 font-semibold">原始值</TableHead>
+                        <TableHead className="w-32 font-semibold">解析值</TableHead>
+                        <TableHead className="w-24 font-semibold">类型</TableHead>
+                        <TableHead className="w-40 font-semibold">时间戳</TableHead>
+                        <TableHead className="w-20 font-semibold text-center">状态</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -376,48 +427,94 @@ export function DataReader({ connectionConfig, disabled = false }: DataReaderPro
                           data.address < range.startAddress + range.length
                         );
                         const addressResult = batchResult.results[index];
+                        const isAlternatingRow = preferences.tableStyle.alternatingRowColors && index % 2 === 1;
 
                         return (
-                          <TableRow key={`${data.address}-${index}`}>
-                            <TableCell className="font-mono text-sm">
-                              {data.address}
+                          <TableRow 
+                            key={`${data.address}-${index}`}
+                            className={`
+                              hover:bg-muted/50 transition-colors duration-150
+                              ${isAlternatingRow ? 'bg-muted/20' : ''}
+                              ${!data.success ? 'bg-red-50 dark:bg-red-950/20' : ''}
+                            `}
+                          >
+                            <TableCell className="font-mono text-sm font-medium">
+                              <div className="flex items-center gap-2">
+                                {preferences.tableStyle.showDataTypeIcons && (
+                                  <div className="w-3 h-3 rounded-full bg-blue-500/20 flex items-center justify-center">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                                  </div>
+                                )}
+                                {data.address}
+                              </div>
                             </TableCell>
-                            <TableCell className="font-mono text-sm">
+                            <TableCell className="font-mono text-sm text-muted-foreground">
                               {data.success ? data.rawValue : '-'}
                             </TableCell>
                             <TableCell className="font-mono text-sm">
                               {data.success ? (
                                 <Tooltip>
                                   <TooltipTrigger>
-                                    <span>{data.displayValue}</span>
+                                    <span className={`
+                                      ${preferences.theme.highlightErrorValues && !data.success ? 'text-red-600' : ''}
+                                      ${data.dataType === 'float32' ? 'text-blue-700 dark:text-blue-400' : ''}
+                                    `}>
+                                      {
+                                        formatNumber(
+                                          data.parsedValue, 
+                                          data.dataType, 
+                                          displayFormat, 
+                                          preferences.numberFormat
+                                        ).display
+                                      }
+                                    </span>
                                   </TooltipTrigger>
                                   <TooltipContent>
                                     <div className="space-y-1">
-                                      <div>十进制: {formatDisplayValue(data.parsedValue, { format: 'dec' })}</div>
-                                      <div>十六进制: {formatDisplayValue(data.parsedValue, { format: 'hex' })}</div>
-                                      <div>二进制: {formatDisplayValue(data.parsedValue, { format: 'bin' })}</div>
+                                      <div className="font-semibold">数据类型: {data.dataType}</div>
+                                      <div>十进制: {formatNumber(data.parsedValue, data.dataType, 'dec', preferences.numberFormat).display}</div>
+                                      <div>十六进制: {formatNumber(data.parsedValue, data.dataType, 'hex', preferences.numberFormat).display}</div>
+                                      <div>二进制: {formatNumber(data.parsedValue, data.dataType, 'bin', preferences.numberFormat).display}</div>
                                     </div>
                                   </TooltipContent>
                                 </Tooltip>
                               ) : (
-                                <span className="text-red-500">错误</span>
+                                <span className="text-red-500 font-medium">错误</span>
                               )}
                             </TableCell>
                             <TableCell className="text-sm">
-                              <Badge variant="outline" className="text-xs">
+                              <Badge 
+                                variant="outline" 
+                                className={`
+                                  text-xs
+                                  ${data.dataType === 'float32' ? 'border-blue-300 text-blue-700 bg-blue-50 dark:bg-blue-950/20' : ''}
+                                  ${data.dataType === 'uint32' || data.dataType === 'int32' ? 'border-purple-300 text-purple-700 bg-purple-50 dark:bg-purple-950/20' : ''}
+                                  ${data.dataType === 'uint16' || data.dataType === 'int16' ? 'border-green-300 text-green-700 bg-green-50 dark:bg-green-950/20' : ''}
+                                `}
+                              >
                                 {matchedRange?.dataType || data.dataType}
                               </Badge>
                             </TableCell>
                             <TableCell className="text-xs text-muted-foreground">
-                              {formatTimestamp(addressResult?.timestamp || batchResult.timestamp)}
+                              <Tooltip>
+                                <TooltipTrigger>
+                                  <span>{formatTime(addressResult?.timestamp || batchResult.timestamp)}</span>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <div className="space-y-1">
+                                    <div>完整时间: {formatTimestamp(addressResult?.timestamp || batchResult.timestamp, { format: 'local', showMilliseconds: true }).display}</div>
+                                    <div>相对时间: {formatTimestamp(addressResult?.timestamp || batchResult.timestamp, { format: 'relative' }).display}</div>
+                                  </div>
+                                </TooltipContent>
+                              </Tooltip>
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="text-center">
                               {data.success ? (
-                                <CheckCircle className="h-4 w-4 text-green-500" />
+                                <CheckCircle className="h-4 w-4 text-green-500 mx-auto" />
                               ) : (
                                 <Tooltip>
                                   <TooltipTrigger>
-                                    <AlertCircle className="h-4 w-4 text-red-500" />
+                                    <AlertCircle className="h-4 w-4 text-red-500 mx-auto" />
                                   </TooltipTrigger>
                                   <TooltipContent>
                                     <p>{data.error || addressResult?.error || '读取失败'}</p>
