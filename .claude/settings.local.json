@@ -22,7 +22,8 @@
       "Bash(done)",
       "Bash(gh auth:*)",
       "Bash(gh issue list:*)",
-      "Bash(gh issue create:*)"
+      "Bash(gh issue create:*)",
+      "Bash(git merge:*)"
     ],
     "deny": [],
     "ask": []
