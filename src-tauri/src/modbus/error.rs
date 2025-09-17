@@ -21,12 +21,14 @@ pub enum ModbusError {
     IoError(#[from] std::io::Error),
 
     #[error("Modbus协议错误: {0}")]
+    #[allow(dead_code)]
     ProtocolError(String),
 
     #[error("配置错误: {0}")]
     ConfigError(String),
 
     #[error("内部错误: {0}")]
+    #[allow(dead_code)]
     InternalError(String),
 }
 

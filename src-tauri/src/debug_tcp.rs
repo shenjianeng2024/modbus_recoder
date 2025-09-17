@@ -1,5 +1,5 @@
-use std::time::Duration;
 use std::net::SocketAddr;
+use std::time::Duration;
 use tokio::net::TcpStream;
 use tokio::time::timeout;
 
@@ -24,8 +24,11 @@ pub async fn test_tcp_connection(ip: &str, port: u16) -> Result<String, String> 
     println!("🚀 尝试建立TCP连接...");
     match timeout(Duration::from_millis(5000), TcpStream::connect(socket_addr)).await {
         Ok(Ok(stream)) => {
-            let result = format!("✅ TCP连接成功! 本地地址: {:?}, 远程地址: {:?}",
-                stream.local_addr(), stream.peer_addr());
+            let result = format!(
+                "✅ TCP连接成功! 本地地址: {:?}, 远程地址: {:?}",
+                stream.local_addr(),
+                stream.peer_addr()
+            );
             println!("{}", result);
             Ok(result)
         }
@@ -42,12 +45,19 @@ pub async fn test_tcp_connection(ip: &str, port: u16) -> Result<String, String> 
     }
 }
 
-pub async fn test_modbus_tcp_connection(ip: &str, port: u16, slave_id: u8) -> Result<String, String> {
-    use tokio_modbus::prelude::*;
+pub async fn test_modbus_tcp_connection(
+    ip: &str,
+    port: u16,
+    slave_id: u8,
+) -> Result<String, String> {
     use std::net::SocketAddr;
+    use tokio_modbus::prelude::*;
 
     let address = format!("{}:{}", ip, port);
-    println!("🔍 开始Modbus TCP连接测试: {} (从站ID: {})", address, slave_id);
+    println!(
+        "🔍 开始Modbus TCP连接测试: {} (从站ID: {})",
+        address, slave_id
+    );
 
     let socket_addr: SocketAddr = match address.parse() {
         Ok(addr) => {
@@ -64,17 +74,19 @@ pub async fn test_modbus_tcp_connection(ip: &str, port: u16, slave_id: u8) -> Re
     println!("🚀 尝试建立Modbus TCP连接...");
 
     // 先尝试新的API (tokio-modbus 0.16+)
-    let connection_result = timeout(
-        Duration::from_millis(5000),
-        tcp::connect(socket_addr)
-    ).await;
+    let connection_result = timeout(Duration::from_millis(5000), tcp::connect(socket_addr)).await;
 
     match connection_result {
         Ok(Ok(mut ctx)) => {
             println!("✅ Modbus TCP连接成功!");
 
             // 尝试读取一个简单的寄存器来测试通信
-            match timeout(Duration::from_millis(3000), ctx.read_holding_registers(0, 1)).await {
+            match timeout(
+                Duration::from_millis(3000),
+                ctx.read_holding_registers(0, 1),
+            )
+            .await
+            {
                 Ok(Ok(data)) => {
                     let result = format!("✅ Modbus通信测试成功! 读取到数据: {:?}", data);
                     println!("{}", result);

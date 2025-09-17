@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { Plus, Edit, Trash2, Download, Upload, AlertTriangle, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -30,7 +30,7 @@ export const AddressRangeManager: React.FC = () => {
     checkOverlaps,
     totalAddresses,
     exportConfig,
-    importConfig,
+    // importConfig,
     isLoading,
     error,
   } = useAddressRangeContext();
@@ -38,7 +38,7 @@ export const AddressRangeManager: React.FC = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingRange, setEditingRange] = useState<ManagedAddressRange | undefined>();
   const [importDialogOpen, setImportDialogOpen] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  // const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 获取重叠检测结果
   const overlapResult = checkOverlaps();

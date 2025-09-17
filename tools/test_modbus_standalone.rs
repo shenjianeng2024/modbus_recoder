@@ -21,13 +21,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // 1. 基础TCP连接测试
         let result = test_basic_tcp(ip, port).await;
-        match result {
-            Ok(msg) => println!("  ✅ TCP: {}", msg),
-            Err(msg) => println!("  ❌ TCP: {}", msg),
-        }
+        let tcp_success = match &result {
+            Ok(msg) => {
+                println!("  ✅ TCP: {}", msg);
+                true
+            }
+            Err(msg) => {
+                println!("  ❌ TCP: {}", msg);
+                false
+            }
+        };
 
         // 2. tokio-modbus连接测试 (如果TCP成功)
-        if result.is_ok() {
+        if tcp_success {
             let modbus_result = test_modbus_connection(ip, port, 1).await;
             match modbus_result {
                 Ok(msg) => println!("  ✅ Modbus: {}", msg),

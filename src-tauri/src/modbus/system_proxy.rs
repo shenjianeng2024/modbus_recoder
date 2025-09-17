@@ -1,5 +1,5 @@
+use std::io::Write;
 use std::process::{Command, Stdio};
-use std::io::{Write, Read};
 use std::time::Duration;
 use tokio::time::sleep;
 
@@ -47,7 +47,8 @@ impl SystemTcpProxy {
 
         // 发送请求
         if let Some(mut stdin) = child.stdin.take() {
-            stdin.write_all(request)
+            stdin
+                .write_all(request)
                 .map_err(|e| format!("发送数据失败: {}", e))?;
             // 关闭stdin以发送数据
             drop(stdin);
@@ -57,7 +58,8 @@ impl SystemTcpProxy {
         sleep(Duration::from_millis(500)).await;
 
         // 读取响应
-        let output = child.wait_with_output()
+        let output = child
+            .wait_with_output()
             .map_err(|e| format!("等待响应失败: {}", e))?;
 
         if output.status.success() && !output.stdout.is_empty() {
@@ -69,7 +71,12 @@ impl SystemTcpProxy {
     }
 
     /// 读取保持寄存器 (Modbus功能码03)
-    pub async fn read_holding_registers(&self, slave_id: u8, start_addr: u16, count: u16) -> Result<Vec<u16>, String> {
+    pub async fn read_holding_registers(
+        &self,
+        slave_id: u8,
+        start_addr: u16,
+        count: u16,
+    ) -> Result<Vec<u16>, String> {
         // 构建Modbus TCP请求
         let transaction_id = 0x0001u16;
         let protocol_id = 0x0000u16;

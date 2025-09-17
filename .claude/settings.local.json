@@ -31,7 +31,11 @@
       "Bash(ping:*)",
       "Bash(nc:*)",
       "Bash(cargo:*)",
-      "WebFetch(domain:docs.rs)"
+      "WebFetch(domain:docs.rs)",
+      "Bash(npm run format:*)",
+      "Bash(npm test:*)",
+      "Bash(xargs kill:*)",
+      "Bash(awk:*)"
     ],
     "deny": [],
     "ask": []

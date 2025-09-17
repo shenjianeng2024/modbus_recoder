@@ -258,7 +258,7 @@ export const ConfigImportDialog: React.FC<ConfigImportDialogProps> = ({
                                 <div>
                                   <h4 className="text-sm font-medium text-red-800">错误</h4>
                                   <ul className="text-sm text-red-700 mt-1 space-y-1">
-                                    {preview.errors.map((error, index) => (
+                                    {preview.errors.map((error: string, index: number) => (
                                       <li key={index}>• {error}</li>
                                     ))}
                                   </ul>
@@ -275,7 +275,7 @@ export const ConfigImportDialog: React.FC<ConfigImportDialogProps> = ({
                                 <div>
                                   <h4 className="text-sm font-medium text-orange-800">警告</h4>
                                   <ul className="text-sm text-orange-700 mt-1 space-y-1">
-                                    {preview.warnings.map((warning, index) => (
+                                    {preview.warnings.map((warning: string, index: number) => (
                                       <li key={index}>• {warning}</li>
                                     ))}
                                   </ul>
@@ -303,7 +303,7 @@ export const ConfigImportDialog: React.FC<ConfigImportDialogProps> = ({
                                     </TableRow>
                                   </TableHeader>
                                   <TableBody>
-                                    {preview.ranges.map((range, index) => (
+                                    {preview.ranges.map((range: any, index: number) => (
                                       <TableRow key={index}>
                                         <TableCell className="font-medium">
                                           {range.name || `地址段 ${index + 1}`}
@@ -312,7 +312,7 @@ export const ConfigImportDialog: React.FC<ConfigImportDialogProps> = ({
                                           {formatAddressRange(range)}
                                         </TableCell>
                                         <TableCell>
-                                          {DATA_TYPE_LABELS[range.dataType]}
+                                          {DATA_TYPE_LABELS[range.dataType as keyof typeof DATA_TYPE_LABELS] || range.dataType}
                                         </TableCell>
                                         <TableCell>
                                           <Badge variant={range.enabled ? "default" : "secondary"}>

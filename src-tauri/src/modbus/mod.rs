@@ -2,17 +2,19 @@ pub mod client;
 pub mod client_tests;
 pub mod error;
 pub mod manager;
-pub mod types;
 pub mod system_proxy;
+pub mod types;
 
 pub use client::ModbusClient;
-pub use error::{ModbusError, Result};
-pub use manager::{AppState, ModbusManager};
-pub use types::{AddressRange, AddressReadResult, BatchReadResult, ConnectionState, ModbusConfig, ReadResult};
+pub use manager::AppState;
+pub use types::{
+    AddressRange, BatchReadResult, ConnectionState, ModbusConfig, ReadResult,
+};
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::modbus::error::ModbusError;
 
     #[test]
     fn test_address_range_validation() {
@@ -36,7 +38,7 @@ mod tests {
     #[test]
     fn test_modbus_config_default() {
         let config = ModbusConfig::default();
-        assert_eq!(config.ip, "192.168.1.199");
+        assert_eq!(config.ip, "192.168.1.100");
         assert_eq!(config.port, 502);
         assert_eq!(config.timeout_ms, 3000);
         assert_eq!(config.slave_id, 1);
@@ -64,7 +66,7 @@ mod tests {
     #[test]
     fn test_modbus_client_config_validation() {
         let client = ModbusClient::new();
-        
+
         // 默认配置应该是有效的
         assert!(client.validate_config().is_ok());
     }

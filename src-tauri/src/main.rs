@@ -2,16 +2,15 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod commands;
-mod modbus;
 mod debug_tcp;
+mod modbus;
 
-use commands::{connection, reading, file_operations};
+use commands::{connection, file_operations, reading};
 use modbus::{
     manager::{
-        modbus_connect, modbus_disconnect, modbus_get_connection_state,
-        modbus_read_holding_registers, modbus_set_config, modbus_test_connection,
-        modbus_read_multiple_ranges, modbus_get_connection_info,
-        modbus_get_config, modbus_validate_config,
+        modbus_connect, modbus_disconnect, modbus_get_config, modbus_get_connection_info,
+        modbus_get_connection_state, modbus_read_holding_registers, modbus_read_multiple_ranges,
+        modbus_set_config, modbus_test_connection, modbus_validate_config,
     },
     AppState,
 };
